@@ -2,6 +2,7 @@ rootProject.name = "GoWayki"
 
 include(":androidApp")
 include(":shared")
+include(":baselineprofile")
 
 pluginManagement {
     repositories {
@@ -22,8 +23,11 @@ pluginManagement {
 
         id("com.android.application").version(agpVersion)
         id("com.android.library").version(agpVersion)
+        id("com.android.test").version(agpVersion)
 
         id("org.jetbrains.compose").version(composeVersion)
+        id("androidx.baselineprofile").version("1.2.4")
+        id("org.jetbrains.kotlin.android").version(kotlinVersion)
     }
 }
 

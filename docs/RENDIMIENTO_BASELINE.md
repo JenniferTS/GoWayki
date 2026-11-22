@@ -1,35 +1,61 @@
-# Baseline de rendimiento (entorno Linux del grupo)
+# Baseline de rendimiento
 
 Fecha: 2026-11-22  
-Host: servidor compartido (sin dispositivo físico Android conectado para runtime).
+Host: servidor compartido del grupo (VM sin KVM / sin vmx·svm).
 
-## Artefactos
+## Artefactos actuales
 
 | Métrica | Valor | Notas |
 |---|---|---|
-| APK debug KMP | **~14 MB** | `androidApp-debug.apk` (incluye `pack.sqlite` ~16 MB comprimido en APK) |
-| APK release Flutter (referencia) | ~110 MB | Offline MapLibre + tiles; no comparable 1:1 |
-| Tests unitarios KMP | **37 / 37 OK** | Planner, money, reports, tutorial, sqlite loader |
-| Cold start device | no medido | Sin emulador/dispositivo aquí |
-| Tiempo hasta buscar ruta | no medido en UI | Red se carga en hilo `city-pack`; UI arranca sin bloquear |
-| Frames / jank mapa | n/a | Mapa MapLibre aún no integrado; preview Compose |
+| APK debug KMP | ~65–70 MB | Incluye mbtiles Arequipa + pack SQLite |
+| Tests unitarios | suite `:shared:testDebugUnitTest` | Planner, TripTracker, ranking week, money… |
+| Baseline Profile | `androidApp/src/main/baseline-prof.txt` | Hand-authored + regenerable |
+| ProfileInstaller | cableado en `GowaykiApp` | Escribe el perfil al primer arranque |
+| Macrobenchmark | módulo `:baselineprofile` | Requiere device/emulator online |
 
-## Presupuestos provisionales (a validar en gama media)
+## Generar perfiles en dispositivo
 
-- Cold start → Home interactiva: < 2.5 s (sin cargar red completa)
+Con teléfono por USB o emulador ya booteado:
+
+```bash
+export ANDROID_HOME=/home/agentes/android-sdk
+cd ~/workspace/gowayki-kmp
+./gradlew :androidApp:assembleBenchmark
+./gradlew :baselineprofile:generateBaselineProfile
+# o medición de cold start:
+./gradlew :baselineprofile:connectedBenchmarkAndroidTest
+```
+
+El generador abre la app, omite onboarding si aparece y toca la CTA de búsqueda.
+
+## Emulador en este host (sin KVM)
+
+Android Emulator 37 bloquea `-accel off` salvo TCG forzado:
+
+```bash
+chmod +x tool/run-emulator-tcg.sh tool/install-apk.sh
+./tool/run-emulator-tcg.sh          # ANDROID_I_WANT_MY_TCG=yes, 1 GB RAM
+./tool/install-apk.sh               # adb install APK debug
+```
+
+Es **muy lento** (TCG). Preferible:
+
+```bash
+adb connect <IP-del-teléfono>:5555
+./tool/install-apk.sh
+```
+
+## Presupuestos
+
+- Cold start → Home interactiva: < 2.5 s (sin esperar red completa)
 - Primera búsqueda usable tras pack listo: < 4 s en frío
-- Plan toy/network: ya < 400 ms en host (suite RAPTOR)
-- APK release objetivo: < 40 MB sin tiles MBTiles; con mapa offline reevaluar
+- Plan RAPTOR (tests host): ya < 400 ms en redes toy
+- Release sin mbtiles: < 40 MB; con mapa offline el APK crece ~4 MB tiles + libs nativas MapLibre
 
-## Optimizaciones ya aplicadas
+## Optimizaciones aplicadas
 
-- Pack SQLite abierto en background; UI no espera
-- Juego no inicia timers hasta entrar a la pantalla; `DisposableEffect` cancela
+- Pack SQLite en background
+- Juego cancela timers al salir
 - `Money` sin Double; tarifa base centralizada
-- Onboarding sin assets pesados (Canvas vectorial)
-
-## Pendiente de medición
-
-- Macrobenchmark / Baseline Profiles Android
-- Instruments en iOS
-- Lecturas Firestore y GPS duty cycle
+- Baseline Profile + ProfileInstaller
+- MapLibre assets instalados una vez a `filesDir`

@@ -1,0 +1,22 @@
+# Baseline Profile (hand-authored). Class rules = no flags. Method rules = HSP…
+# Regenerate: ./gradlew :baselineprofile:generateBaselineProfile
+
+Lcom/myapplication/MainActivity;
+HSPLcom/myapplication/MainActivity;->onCreate(Landroid/os/Bundle;)V
+Lcom/myapplication/GowaykiApp;
+HSPLcom/myapplication/GowaykiApp;->onCreate()V
+
+Lpe/edu/tecsup/gowayki/ui/AppSession;
+HSPLpe/edu/tecsup/gowayki/ui/AppSession;->bootstrap()V
+HSPLpe/edu/tecsup/gowayki/ui/AppSession;->planTrip()V
+
+Lpe/edu/tecsup/gowayki/domain/planner/JourneyPlanner;
+Lpe/edu/tecsup/gowayki/domain/planner/RaptorPlanner;
+Lpe/edu/tecsup/gowayki/domain/money/Money;
+Lpe/edu/tecsup/gowayki/domain/tracking/TripTracker;
+HSPLpe/edu/tecsup/gowayki/domain/tracking/TripTracker;->confirmStep()Lpe/edu/tecsup/gowayki/domain/tracking/TripProgress;
+
+Lpe/edu/tecsup/gowayki/data/map/OfflineMapInstaller;
+Lpe/edu/tecsup/gowayki/data/citypack/SqliteCityPackRepository;
+Lpe/edu/tecsup/gowayki/data/citypack/SqlitePlannerNetworkLoader;
+Lpe/edu/tecsup/gowayki/i18n/StringCatalog;
