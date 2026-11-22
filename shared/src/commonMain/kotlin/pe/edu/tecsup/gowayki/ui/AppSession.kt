@@ -3,15 +3,15 @@ package pe.edu.tecsup.gowayki.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import pe.edu.tecsup.gowayki.domain.community.CommunityReport
 import pe.edu.tecsup.gowayki.domain.community.InMemoryReportsRepository
 import pe.edu.tecsup.gowayki.domain.community.ReportDraft
 import pe.edu.tecsup.gowayki.domain.community.ReportKind
 import pe.edu.tecsup.gowayki.domain.community.ReportsRepository
 import pe.edu.tecsup.gowayki.domain.community.StoredReport
-import pe.edu.tecsup.gowayki.platform.platformLastLocation
-import pe.edu.tecsup.gowayki.platform.platformRemoteReports
-import pe.edu.tecsup.gowayki.platform.platformRequestLocationPermission
-import pe.edu.tecsup.gowayki.platform.platformUserStateSync
+import pe.edu.tecsup.gowayki.domain.game.PendingScore
+import pe.edu.tecsup.gowayki.domain.game.WeeklyRanking
+import pe.edu.tecsup.gowayki.domain.game.rankingWeek
 import pe.edu.tecsup.gowayki.domain.models.CityStop
 import pe.edu.tecsup.gowayki.domain.models.PlaceResult
 import pe.edu.tecsup.gowayki.domain.money.Money
@@ -35,8 +35,22 @@ import pe.edu.tecsup.gowayki.domain.preferences.TutorialMigrationPolicy
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialProgress
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialStatus
 import pe.edu.tecsup.gowayki.domain.repositories.PlaceSearchRepository
+import pe.edu.tecsup.gowayki.domain.tracking.PositionFix
+import pe.edu.tecsup.gowayki.domain.tracking.TripAlertKind
+import pe.edu.tecsup.gowayki.domain.tracking.TripPhase
+import pe.edu.tecsup.gowayki.domain.tracking.TripProgress
+import pe.edu.tecsup.gowayki.domain.tracking.TripTracker
 import pe.edu.tecsup.gowayki.i18n.StringCatalog
 import pe.edu.tecsup.gowayki.i18n.Strings
+import pe.edu.tecsup.gowayki.platform.AlarmMode
+import pe.edu.tecsup.gowayki.platform.platformClearTripNotifications
+import pe.edu.tecsup.gowayki.platform.platformLastLocation
+import pe.edu.tecsup.gowayki.platform.platformRanking
+import pe.edu.tecsup.gowayki.platform.platformRemoteReports
+import pe.edu.tecsup.gowayki.platform.platformRequestLocationPermission
+import pe.edu.tecsup.gowayki.platform.platformTripAlert
+import pe.edu.tecsup.gowayki.platform.platformUserStateSync
+import pe.edu.tecsup.gowayki.platform.platformWatchTripLocation
 
 sealed class Screen {
     data object Splash : Screen()
@@ -49,8 +63,10 @@ sealed class Screen {
     data object Profile : Screen()
     data object Settings : Screen()
     data object Game : Screen()
+    data object Ranking : Screen()
     data object Help : Screen()
     data object Auth : Screen()
+    data object ActiveTrip : Screen()
 }
 
 data class AuthUser(
@@ -59,6 +75,18 @@ data class AuthUser(
     val isNewRegistration: Boolean = false,
     val isGuest: Boolean = false,
 )
+
+enum class ActiveTripStatus { Starting, Active, Completed, Stopped, Error }
+
+data class ActiveTripState(
+    val trip: Itinerary,
+    val progress: TripProgress,
+    val status: ActiveTripStatus,
+    val stale: Boolean = true,
+) {
+    val running: Boolean
+        get() = status == ActiveTripStatus.Starting || status == ActiveTripStatus.Active
+}
 
 class AppSession(
     private val preferences: PreferencesRepository = InMemoryPreferencesRepository(),
@@ -71,6 +99,7 @@ class AppSession(
     var locale by mutableStateOf(preferences.locale(deviceLanguage))
         private set
     var reduceMotion by mutableStateOf(false)
+    var alarmMode by mutableStateOf(AlarmMode.Sound)
     var screen by mutableStateOf<Screen>(Screen.Splash)
         private set
     var onboardingStep by mutableStateOf(0)
@@ -99,7 +128,19 @@ class AppSession(
     var reportLng by mutableStateOf(-71.5375)
     var reportMessage by mutableStateOf<String?>(null)
     var myReports by mutableStateOf<List<StoredReport>>(emptyList())
+    var nearbyReports by mutableStateOf<List<CommunityReport>>(emptyList())
     var packReady by mutableStateOf(false)
+    var activeTrip by mutableStateOf<ActiveTripState?>(null)
+        private set
+    var tripMessage by mutableStateOf<String?>(null)
+    var ranking by mutableStateOf<WeeklyRanking?>(null)
+    var rankingMessage by mutableStateOf<String?>(null)
+    var rankingLoading by mutableStateOf(false)
+    var lastGameScore by mutableStateOf(0)
+    var lastGameDurationMs by mutableStateOf(0)
+
+    private var tracker: TripTracker? = null
+    private var stopLocationWatch: (() -> Unit)? = null
 
     val strings: Strings get() = StringCatalog.forLocale(locale)
     val baseFare: Money get() = Money.BASE
@@ -109,6 +150,7 @@ class AppSession(
         val onboarding = preferences.readOnboarding()
         screen = if (onboarding == null) Screen.Onboarding else Screen.Home
         maybeStartTutorial()
+        refreshNearbyReports()
     }
 
     fun updateLocale(value: AppLocale) {
@@ -129,6 +171,8 @@ class AppSession(
 
     fun go(to: Screen) {
         screen = to
+        if (to == Screen.Home) refreshNearbyReports()
+        if (to == Screen.Ranking) loadRanking()
     }
 
     fun searchPlaces(query: String) {
@@ -251,12 +295,12 @@ class AppSession(
                 remote.createOrReuse(draft, current.uid)
                 reports.markPublished(id, UtcDateTime.now())
             } else {
-                // Offline / sin backend: queda pendiente localmente.
                 reports.markPublished(id, UtcDateTime.now())
             }
             myReports = reports.mine(current.uid)
             reportMessage = "ok"
             reportDescription = ""
+            refreshNearbyReports()
             screen = Screen.Home
         } catch (t: Throwable) {
             reportMessage = t.message ?: strings.errorGeneric
@@ -272,6 +316,22 @@ class AppSession(
         }
         reports.delete(id)
         myReports = reports.mine(uid)
+        refreshNearbyReports()
+    }
+
+    fun refreshNearbyReports() {
+        runCatching {
+            val since = UtcDateTime.now().let {
+                UtcDateTime(it.epochMicros - 72L * 3_600_000_000L)
+            }
+            val loc = platformLastLocation()
+            nearbyReports = platformRemoteReports()?.activeAround(
+                since = since,
+                centerLat = loc?.latitude ?: reportLat,
+                centerLng = loc?.longitude ?: reportLng,
+                radiusKm = 8.0,
+            )?.items.orEmpty()
+        }
     }
 
     fun applyGoogleUser(uid: String, displayName: String?, isNew: Boolean) {
@@ -297,6 +357,7 @@ class AppSession(
         }
         screen = Screen.Home
         maybeStartTutorial()
+        loadRanking()
     }
 
     fun signInWithGoogleDemo(isNew: Boolean) {
@@ -362,6 +423,133 @@ class AppSession(
         val major = money.amountMinor / 100
         val minor = (money.amountMinor % 100).toString().padStart(2, '0')
         return "S/ $major.$minor"
+    }
+
+    fun startActiveTrip() {
+        val trip = selectedItinerary ?: return
+        if (activeTrip?.running == true) {
+            tripMessage = strings.activeTrip
+            screen = Screen.ActiveTrip
+            return
+        }
+        tripMessage = null
+        tracker = TripTracker(trip)
+        activeTrip = ActiveTripState(
+            trip = trip,
+            progress = tracker!!.initial,
+            status = ActiveTripStatus.Starting,
+        )
+        platformRequestLocationPermission { granted ->
+            if (!granted) {
+                // Permite viaje con confirmación manual sin GPS.
+                activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = true)
+                screen = Screen.ActiveTrip
+                return@platformRequestLocationPermission
+            }
+            stopLocationWatch?.invoke()
+            stopLocationWatch = platformWatchTripLocation { fix -> acceptFix(fix) }
+            activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = false)
+            screen = Screen.ActiveTrip
+        }
+    }
+
+    fun confirmTripStep() {
+        val t = tracker ?: return
+        val progress = t.confirmStep()
+        acceptProgress(progress)
+    }
+
+    fun stopActiveTrip(status: ActiveTripStatus = ActiveTripStatus.Stopped) {
+        stopLocationWatch?.invoke()
+        stopLocationWatch = null
+        platformClearTripNotifications()
+        activeTrip = activeTrip?.copy(status = status)
+        tracker = null
+    }
+
+    private fun acceptFix(fix: PositionFix) {
+        val t = tracker ?: return
+        val progress = t.update(fix, UtcDateTime.now())
+        acceptProgress(progress)
+    }
+
+    private fun acceptProgress(progress: TripProgress) {
+        val current = activeTrip ?: return
+        activeTrip = current.copy(
+            progress = progress,
+            stale = progress.fix == null,
+            status = if (progress.phase == TripPhase.Completed) {
+                ActiveTripStatus.Completed
+            } else {
+                current.status
+            },
+        )
+        for (alert in progress.alerts) {
+            val title = if (alert.kind == TripAlertKind.Alight) {
+                strings.alightAlertTitle
+            } else {
+                strings.transferAlertTitle
+            }
+            val body = if (alert.kind == TripAlertKind.Alight) {
+                strings.alightAlertBody.replace("%s", alert.stopName)
+            } else {
+                strings.transferAlertBody.replace("%s", alert.stopName)
+            }
+            platformTripAlert(title, body, alarmMode)
+        }
+        if (progress.phase == TripPhase.Completed) {
+            stopActiveTrip(ActiveTripStatus.Completed)
+        }
+    }
+
+    fun loadRanking() {
+        rankingLoading = true
+        rankingMessage = null
+        runCatching {
+            val week = rankingWeek()
+            val uid = user?.takeIf { !it.isGuest }?.uid
+            ranking = platformRanking()?.load(week, uid)
+                ?: WeeklyRanking(top = emptyList())
+        }.onFailure {
+            rankingMessage = it.message ?: strings.errorGeneric
+        }
+        rankingLoading = false
+    }
+
+    fun submitGameScore(score: Int, durationMs: Int) {
+        lastGameScore = score
+        lastGameDurationMs = durationMs
+        val current = user
+        if (current == null || current.isGuest) {
+            rankingMessage = strings.signIn
+            screen = Screen.Auth
+            return
+        }
+        val client = platformRanking()
+        if (client == null) {
+            rankingMessage = strings.errorGeneric
+            return
+        }
+        runCatching {
+            val pending = PendingScore(
+                week = rankingWeek(),
+                score = score.coerceIn(0, 5000),
+                durationMs = durationMs.coerceIn(1000, 120_000),
+            )
+            val name = current.displayName?.ifBlank { null } ?: "Wayki"
+            client.publish(current.uid, name, pending)
+            loadRanking()
+            screen = Screen.Ranking
+        }.onFailure {
+            rankingMessage = it.message ?: strings.errorGeneric
+        }
+    }
+
+    fun routeGeometry(trip: Itinerary?): List<GeoPoint> {
+        if (trip == null) return emptyList()
+        return trip.legs.flatMap { leg ->
+            if (leg.geometry.size >= 2) leg.geometry else listOf(leg.from, leg.to)
+        }
     }
 
     private fun demoJourney(from: GeoPoint, to: GeoPoint): JourneyResponse {

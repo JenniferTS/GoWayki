@@ -45,6 +45,7 @@ fun GameScreen(session: AppSession) {
     var busX by remember { mutableStateOf(0.5f) }
     var obstacles by remember { mutableStateOf(listOf(0.2f to 0f, 0.7f to -0.4f)) }
     var running by remember { mutableStateOf(true) }
+    var elapsedMs by remember { mutableStateOf(0) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -65,6 +66,7 @@ fun GameScreen(session: AppSession) {
                 }
             }
             if (obstacles.any { it.second in 0.0f..0.05f }) score += 1
+            elapsedMs += 32
             kotlinx.coroutines.delay(32)
         }
     }
@@ -111,7 +113,23 @@ fun GameScreen(session: AppSession) {
                 obstacles = listOf(0.2f to 0f, 0.7f to -0.4f)
                 busX = 0.5f
                 paused = false
+                elapsedMs = 0
             }) { Text(s.gameRestart) }
         }
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = {
+                running = false
+                val duration = elapsedMs.coerceIn(1000, 120_000)
+                val publishScore = score.coerceIn(0, 5000).coerceAtMost(duration / 1000 * 30 + 30)
+                session.submitGameScore(publishScore, duration)
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(s.gameSubmitScore) }
+        OutlinedButton(
+            onClick = { session.go(Screen.Ranking) },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(s.weeklyRanking) }
+        session.rankingMessage?.let { Text(it, color = Color(0xFFB00020)) }
     }
 }

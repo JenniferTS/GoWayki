@@ -1,6 +1,6 @@
 # GoWayki KMP — estado de migración
 
-Actualizado: 2026-11-22 (noche)  
+Actualizado: 2026-11-22 (noche, bloque MapLibre/viaje/ranking)  
 Rama: `feat/kmp-migration` → https://github.com/JenniferTS/GoWayki/tree/feat/kmp-migration  
 Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
@@ -15,12 +15,13 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 | Tutorial post-Google | — | Local + Firestore preferences | Implementado |
 | Auth Google | Sí | Android real + demo | Implementado |
 | Reportes Firestore | Sí | Cliente remoto + borrador local | Implementado |
+| Feed reportes cercanos | Sí | Home + mapa | Implementado |
 | Rules tipos nuevos | — | Desplegadas en prod | Verificado API |
 | Ubicación puntual reportes | Sí | Permiso + lastKnown | Implementado |
-| Mapa MapLibre offline | Sí | Preview Compose | Parcial |
-| Viaje activo / alarmas | Sí | — | Ausente |
-| Ranking / scores | Sí | — | Ausente |
-| Juego | WebView | Compose | Implementado |
+| Mapa MapLibre offline | Sí | SDK + mbtiles Arequipa | Implementado |
+| Viaje activo / alarmas | Sí | TripTracker + GPS + notif | Implementado |
+| Ranking / scores | Sí | Firestore leaderboards | Implementado |
+| Juego | WebView | Compose + publish score | Implementado |
 | iOS | — | Shell Xcode | No prioridad |
 | Baseline Profiles | — | — | Pendiente |
 | Emulador Android (KVM) | — | AVD sin KVM | Bloqueado host |
@@ -31,11 +32,12 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 export ANDROID_HOME=/home/agentes/android-sdk
 cd ~/workspace/gowayki-kmp
 ./gradlew :androidApp:assembleDebug
-# APK: androidApp/build/outputs/apk/debug/
+# APK: androidApp/build/outputs/apk/debug/androidApp-debug.apk
 ```
 
 ## Firebase
 
 - Proyecto `gowayki-lab`, package `pe.edu.tecsup.gowayki_lab`
 - SA: `~/.config/firebase-tokens/gowayki-lab-sa.json` (fuera de Git)
-- Rules prod con `heavy_traffic` / `road_blocked` (deploy sharon 2026-11-22)
+- Rules prod con `heavy_traffic` / `road_blocked` + leaderboards
+- Ranking: `leaderboards/{arequipa_YYYY-Www}/scores/{uid}`

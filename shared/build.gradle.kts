@@ -43,6 +43,8 @@ kotlin {
                 implementation("com.google.firebase:firebase-auth")
                 implementation("com.google.firebase:firebase-firestore")
                 implementation("com.google.android.gms:play-services-auth:21.2.0")
+                implementation("com.google.android.gms:play-services-location:21.3.0")
+                implementation("org.maplibre.gl:android-sdk:11.5.2")
             }
         }
         val iosX64Main by getting

@@ -1,25 +1,49 @@
 package pe.edu.tecsup.gowayki.platform
 
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import pe.edu.tecsup.gowayki.data.community.FirestoreReportsClient
+import pe.edu.tecsup.gowayki.data.game.FirestoreRankingClient
 import pe.edu.tecsup.gowayki.data.location.AndroidLocationFix
 import pe.edu.tecsup.gowayki.data.sync.FirestoreUserStateSync
 import pe.edu.tecsup.gowayki.domain.community.RemoteReportsClient
+import pe.edu.tecsup.gowayki.domain.game.RankingClient
+import pe.edu.tecsup.gowayki.domain.planner.GeoPoint
+import pe.edu.tecsup.gowayki.domain.planner.UtcDateTime
 import pe.edu.tecsup.gowayki.domain.preferences.OnboardingStatus
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialProgress
+import pe.edu.tecsup.gowayki.domain.tracking.PositionFix
 
 object AndroidPlatformHost {
     @Volatile var activity: ComponentActivity? = null
     @Volatile var remoteReports: RemoteReportsClient? = null
     @Volatile var userSync: UserStateSync = NoUserStateSync
+    @Volatile var ranking: RankingClient? = null
     var requestLocation: ((onResult: (Boolean) -> Unit) -> Unit)? = null
 }
 
 actual fun platformRemoteReports(): RemoteReportsClient? = AndroidPlatformHost.remoteReports
 
 actual fun platformUserStateSync(): UserStateSync = AndroidPlatformHost.userSync
+
+actual fun platformRanking(): RankingClient? = AndroidPlatformHost.ranking
 
 actual fun platformLastLocation(): PlatformLocation? {
     val act = AndroidPlatformHost.activity ?: return null
@@ -32,13 +56,93 @@ actual fun platformRequestLocationPermission(onResult: (Boolean) -> Unit) {
     if (req == null) onResult(false) else req(onResult)
 }
 
+actual fun platformTripAlert(title: String, body: String, mode: AlarmMode) {
+    if (mode == AlarmMode.Off) return
+    val act = AndroidPlatformHost.activity ?: return
+    val nm = act.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val channelId = "gowayki_trip"
+    if (Build.VERSION.SDK_INT >= 26) {
+        nm.createNotificationChannel(
+            NotificationChannel(channelId, "Viaje GoWayki", NotificationManager.IMPORTANCE_HIGH),
+        )
+    }
+    val notification = NotificationCompat.Builder(act, channelId)
+        .setSmallIcon(android.R.drawable.ic_dialog_map)
+        .setContentTitle(title)
+        .setContentText(body)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setAutoCancel(true)
+        .build()
+    nm.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
+    if (mode == AlarmMode.Vibration || mode == AlarmMode.Sound) {
+        vibrate(act)
+    }
+}
+
+actual fun platformClearTripNotifications() {
+    val act = AndroidPlatformHost.activity ?: return
+    val nm = act.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    nm.cancelAll()
+}
+
+actual fun platformWatchTripLocation(onFix: (PositionFix) -> Unit): () -> Unit {
+    val act = AndroidPlatformHost.activity ?: return { }
+    if (!AndroidLocationFix.hasPermission(act)) return { }
+    val client = LocationServices.getFusedLocationProviderClient(act)
+    val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3_000L)
+        .setMinUpdateIntervalMillis(2_000L)
+        .setMinUpdateDistanceMeters(5f)
+        .build()
+    val callback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            val loc = result.lastLocation ?: return
+            onFix(
+                PositionFix(
+                    point = GeoPoint(loc.latitude, loc.longitude),
+                    accuracyMeters = loc.accuracy.toDouble(),
+                    at = UtcDateTime.now(),
+                ),
+            )
+        }
+    }
+    try {
+        client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+    } catch (_: SecurityException) {
+        return { }
+    }
+    return {
+        runCatching { client.removeLocationUpdates(callback) }
+    }
+}
+
+private fun vibrate(context: Context) {
+    try {
+        if (Build.VERSION.SDK_INT >= 31) {
+            val vm = context.getSystemService(VibratorManager::class.java)
+            vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= 26) {
+                v.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                v.vibrate(400)
+            }
+        }
+    } catch (_: Throwable) {
+    }
+}
+
 fun installAndroidPlatform(
     activity: ComponentActivity,
     remote: RemoteReportsClient = FirestoreReportsClient(),
     sync: FirestoreUserStateSync = FirestoreUserStateSync(),
+    ranking: RankingClient = FirestoreRankingClient(),
 ) {
     AndroidPlatformHost.activity = activity
     AndroidPlatformHost.remoteReports = remote
+    AndroidPlatformHost.ranking = ranking
     AndroidPlatformHost.userSync = object : UserStateSync {
         override fun ensureUser(uid: String) = sync.ensureUserDoc(uid)
         override fun pushTutorial(uid: String, progress: TutorialProgress) = sync.pushTutorial(uid, progress)
@@ -65,6 +169,13 @@ fun installAndroidPlatform(
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                 ),
             )
+        }
+    }
+    if (Build.VERSION.SDK_INT >= 33) {
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9911)
         }
     }
 }
