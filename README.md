@@ -25,13 +25,25 @@ cd ~/workspace/gowayki-kmp
 
 APK debug: `androidApp/build/outputs/apk/debug/`.
 
+Instalar (teléfono o emulador TCG):
+
+```bash
+./tool/install-apk.sh
+# sin KVM en este host:
+./tool/run-emulator-tcg.sh
+```
+
+iOS (solo Mac + Xcode): ver `docs/IOS.md`.  
+Rendimiento / Baseline Profiles: `docs/RENDIMIENTO_BASELINE.md`.  
+Emulador sin KVM: `docs/EMULADOR.md`.
+
 ## Módulos
 
 - `shared` — dominio (planificador RAPTOR, dinero, reportes, preferencias), datos SQLite, UI Compose común
-- `androidApp` — Activity, assets `city/arequipa/pack.sqlite`, permisos
+- `androidApp` — Activity, assets city pack + mapa offline, ProfileInstaller
+- `baselineprofile` — Macrobenchmark / generador de Baseline Profiles
 - `iosApp` — shell Xcode (framework `shared`)
 - `firebase/` — rules/indexes locales (proyecto `gowayki-lab`); **no desplegar sin autorización**
-
 ## Tarifa
 
 Pasaje base centralizado: `Money.BASE` = **130** minor units **PEN** (S/ 1.30).  
