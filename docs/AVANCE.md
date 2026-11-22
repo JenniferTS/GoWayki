@@ -9,3 +9,7 @@
 - Verificado: `./gradlew :shared:testDebugUnitTest` (37 OK) + `:androidApp:assembleDebug` (~14 MB).
 - Firebase: rules locales con tipos nuevos; sin deploy; MCP sin autenticar.
 - Siguiente: MapLibre, Google Sign-In real, sync tutorial/reportes, iOS en Mac, mediciones en dispositivo.
+
+## 2026-11-22 (noche)
+- Rules Firestore en producción con heavy_traffic/road_blocked (deploy de sharon).
+- Auth Google Android + SHA debug registrados.
