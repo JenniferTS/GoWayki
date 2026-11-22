@@ -41,6 +41,7 @@ kotlin {
                 api("androidx.core:core-ktx:1.10.1")
                 implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
                 implementation("com.google.firebase:firebase-auth")
+                implementation("com.google.firebase:firebase-firestore")
                 implementation("com.google.android.gms:play-services-auth:21.2.0")
             }
         }

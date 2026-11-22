@@ -424,7 +424,16 @@ fun ReportsScreen(session: AppSession) {
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        Text("${s.reportPickMap}: ${session.reportLat}, ${session.reportLng}", color = GowaykiColors.Stone, fontSize = 12.sp)
+        Text(
+            "${s.reportPickMap}: ${session.reportLat}, ${session.reportLng}",
+            color = GowaykiColors.Stone,
+            fontSize = 12.sp,
+        )
+        OutlinedButton(
+            onClick = { session.useCurrentLocationForReport() },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(s.reportUseLocation) }
+        Text(s.communityDisclaimer, color = GowaykiColors.Stone, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
         Button(
             onClick = { session.submitReport() },
             modifier = Modifier.fillMaxWidth(),
