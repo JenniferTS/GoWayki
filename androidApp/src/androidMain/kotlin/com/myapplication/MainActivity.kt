@@ -16,6 +16,7 @@ import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
 import pe.edu.tecsup.gowayki.domain.repositories.CityPackRepository
 import pe.edu.tecsup.gowayki.domain.repositories.PlaceSearchRepository
 import pe.edu.tecsup.gowayki.platform.GoogleSignInBridge
+import pe.edu.tecsup.gowayki.platform.installAndroidPlatform
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
@@ -36,6 +37,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        installAndroidPlatform(this)
 
         authRepo = AndroidFirebaseAuthRepository(
             activity = this,

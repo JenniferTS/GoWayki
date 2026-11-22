@@ -1,53 +1,41 @@
 # GoWayki KMP — estado de migración
 
-Actualizado: 2026-11-22  
-Rama: `feat/kmp-migration`  
-Original (Flutter, intacto): `~/workspace/gowayki-lab-respaldo` → `NICO-bestacclaimed/gowayki-lab-respaldo-31fbe31` @ `31fbe31`
+Actualizado: 2026-11-22 (noche)  
+Rama: `feat/kmp-migration` → https://github.com/JenniferTS/GoWayki/tree/feat/kmp-migration  
+Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
-## Matriz funcional
+## Matriz
 
-| Funcionalidad | Original Flutter | Estado KMP | Pendiente | Prueba |
-|---|---|---|---|---|
-| Planificador RAPTOR offline | Implementado | Implementado y verificado (toy network) | Validar red real Arequipa en dispositivo | Unit + device |
-| Búsqueda origen/destino FTS5 | Implementado | Implementado (Android SQLite) | iOS driver | Device |
-| Tarifa base S/ 1.30 | Pack tenía S/ 1.00 | Implementado (`Money.BASE=130`) | Regenerar pack opcional | Unit |
-| Onboarding 3 pasos ES/EN | Implementado (otro copy) | Implementado | Animaciones pulidas en device | UI manual |
-| Tutorial contextual post-Google | Ausente / parcial | Implementado (política migración) | Sync Firebase real | Unit + device |
-| Reportes comunidad | detour/missing_stop/… | Parcial (nuevos tipos + local) | Firebase remoto, geocerca, rate limit | Unit local; rules no desplegadas |
-| Auth Google | Implementado | Parcial (demo + hooks) | GitLive/oficial KMP + SHA | Device |
-| Mapa MapLibre offline | Implementado | Parcial (preview Compose) | MapLibre Android/iOS | Device |
-| Viaje activo / alarmas | Implementado | Ausente | Port | — |
-| Juego Wayki Combi | WebView/JS | Implementado Compose ligero | Paridad visual sprites | Unit/UI |
-| Ranking semanal | Implementado | Ausente | Port | — |
-| Actualización city pack | Implementado | Parcial (stamp SHA) | Hosting download | — |
-| i18n ES/EN | Completo | Parcial (strings críticas) | Cobertura total ARB | — |
-| Baseline Profiles / perf | Medido Windows AOT | Ausente | Release + Macrobenchmark | — |
-| iOS runtime | No compilado en Windows | Config Xcode template | Build en macOS | Bloqueado aquí |
+| Funcionalidad | Original | KMP | Estado |
+|---|---|---|---|
+| Planificador RAPTOR | Sí | Sí + tests | Verificado |
+| Búsqueda FTS5 | Sí | Android SQLite | Verificado build |
+| Tarifa S/ 1.30 | Pack 1.0 | Money.BASE 130 | Verificado |
+| Onboarding ES/EN | Sí | Sí + sync remoto | Implementado |
+| Tutorial post-Google | — | Local + Firestore preferences | Implementado |
+| Auth Google | Sí | Android real + demo | Implementado |
+| Reportes Firestore | Sí | Cliente remoto + borrador local | Implementado |
+| Rules tipos nuevos | — | Desplegadas en prod | Verificado API |
+| Ubicación puntual reportes | Sí | Permiso + lastKnown | Implementado |
+| Mapa MapLibre offline | Sí | Preview Compose | Parcial |
+| Viaje activo / alarmas | Sí | — | Ausente |
+| Ranking / scores | Sí | — | Ausente |
+| Juego | WebView | Compose | Implementado |
+| iOS | — | Shell Xcode | No prioridad |
+| Baseline Profiles | — | — | Pendiente |
+| Emulador Android (KVM) | — | AVD sin KVM | Bloqueado host |
 
-## Decisiones
-
-- No se reescribió el repo Flutter; KMP vive en carpeta nueva.
-- Tarifa: el loader ignora `default_fare.amount=1.0` del pack y usa `Money.BASE` (130 PEN). `line_fares` tiene precedencia.
-- Reportes: tipos nuevos `heavy_traffic`, `detour`, `road_blocked`, `other`; legacy solo lectura. Caducidad por tipo en app; rules Firestore listas localmente (72h confirm window legacy).
-- Tutorial: cuentas sin campo ⇒ completado (no “nuevo”).
-- Firebase MCP en esta sesión: sin login; no se desplegó nada.
-- iOS: sin macOS/Xcode en el servidor; framework KMP preparado, no validado.
-
-## Cómo ejecutar
+## Cómo ejecutar Android
 
 ```bash
 export ANDROID_HOME=/home/agentes/android-sdk
-export ANDROID_SDK_ROOT=/home/agentes/android-sdk
 cd ~/workspace/gowayki-kmp
-./gradlew :shared:testDebugUnitTest
 ./gradlew :androidApp:assembleDebug
 # APK: androidApp/build/outputs/apk/debug/
 ```
 
-iOS (macOS): abrir `iosApp/iosApp.xcodeproj`, compilar framework `:shared`, correr en simulador.
-
 ## Firebase
 
-- Proyecto: `gowayki-lab`
-- Package Android: `pe.edu.tecsup.gowayki_lab`
-- Rules locales: `firebase/firestore.rules` (incluye tipos nuevos; **no desplegado**)
+- Proyecto `gowayki-lab`, package `pe.edu.tecsup.gowayki_lab`
+- SA: `~/.config/firebase-tokens/gowayki-lab-sa.json` (fuera de Git)
+- Rules prod con `heavy_traffic` / `road_blocked` (deploy sharon 2026-11-22)

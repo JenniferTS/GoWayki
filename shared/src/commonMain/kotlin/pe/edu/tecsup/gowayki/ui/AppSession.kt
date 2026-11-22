@@ -8,6 +8,10 @@ import pe.edu.tecsup.gowayki.domain.community.ReportDraft
 import pe.edu.tecsup.gowayki.domain.community.ReportKind
 import pe.edu.tecsup.gowayki.domain.community.ReportsRepository
 import pe.edu.tecsup.gowayki.domain.community.StoredReport
+import pe.edu.tecsup.gowayki.platform.platformLastLocation
+import pe.edu.tecsup.gowayki.platform.platformRemoteReports
+import pe.edu.tecsup.gowayki.platform.platformRequestLocationPermission
+import pe.edu.tecsup.gowayki.platform.platformUserStateSync
 import pe.edu.tecsup.gowayki.domain.models.CityStop
 import pe.edu.tecsup.gowayki.domain.models.PlaceResult
 import pe.edu.tecsup.gowayki.domain.money.Money
@@ -113,7 +117,12 @@ class AppSession(
     }
 
     fun finishOnboarding(skipped: Boolean) {
-        preferences.saveOnboarding(if (skipped) OnboardingStatus.Skipped else OnboardingStatus.Completed)
+        val status = if (skipped) OnboardingStatus.Skipped else OnboardingStatus.Completed
+        preferences.saveOnboarding(status)
+        val uid = user?.takeIf { !it.isGuest }?.uid
+        if (uid != null) {
+            runCatching { platformUserStateSync().pushOnboarding(uid, status) }
+        }
         screen = Screen.Home
         maybeStartTutorial()
     }
@@ -201,6 +210,24 @@ class AppSession(
         }
     }
 
+    fun useCurrentLocationForReport(onNeedPermission: (() -> Unit)? = null) {
+        platformRequestLocationPermission { granted ->
+            if (!granted) {
+                reportMessage = strings.permissionLocationRationale
+                onNeedPermission?.invoke()
+                return@platformRequestLocationPermission
+            }
+            val fix = platformLastLocation()
+            if (fix == null) {
+                reportMessage = strings.errorGeneric
+            } else {
+                reportLat = fix.latitude
+                reportLng = fix.longitude
+                reportMessage = null
+            }
+        }
+    }
+
     fun submitReport() {
         val current = user
         if (current == null || current.isGuest) {
@@ -209,7 +236,8 @@ class AppSession(
             return
         }
         try {
-            val id = reports.newId()
+            val remote = platformRemoteReports()
+            val id = remote?.newId() ?: reports.newId()
             val draft = ReportDraft(
                 id = id,
                 kind = reportKind,
@@ -219,7 +247,13 @@ class AppSession(
             )
             reports.saveDraft(draft, current.uid)
             reports.markPending(id)
-            reports.markPublished(id, UtcDateTime.now())
+            if (remote != null) {
+                remote.createOrReuse(draft, current.uid)
+                reports.markPublished(id, UtcDateTime.now())
+            } else {
+                // Offline / sin backend: queda pendiente localmente.
+                reports.markPublished(id, UtcDateTime.now())
+            }
             myReports = reports.mine(current.uid)
             reportMessage = "ok"
             reportDescription = ""
@@ -230,8 +264,14 @@ class AppSession(
     }
 
     fun withdrawReport(id: String) {
+        val uid = user?.uid
+        runCatching {
+            if (uid != null && !user!!.isGuest) {
+                platformRemoteReports()?.deleteMine(id, uid)
+            }
+        }
         reports.delete(id)
-        myReports = reports.mine(user?.uid)
+        myReports = reports.mine(uid)
     }
 
     fun applyGoogleUser(uid: String, displayName: String?, isNew: Boolean) {
@@ -241,8 +281,20 @@ class AppSession(
             isNewRegistration = isNew,
             isGuest = false,
         )
-        tutorial = TutorialMigrationPolicy.resolve(isNew, preferences.readTutorial())
+        val sync = platformUserStateSync()
+        runCatching { sync.ensureUser(uid) }
+        val remoteTutorial = runCatching { sync.pullTutorial(uid) }.getOrNull()
+        tutorial = if (isNew) {
+            TutorialMigrationPolicy.forNewGoogleRegistration()
+        } else {
+            TutorialMigrationPolicy.resolve(false, remoteTutorial ?: preferences.readTutorial())
+        }
         preferences.saveTutorial(tutorial)
+        runCatching { sync.pushTutorial(uid, tutorial) }
+        val remoteOnboarding = runCatching { sync.pullOnboarding(uid) }.getOrNull()
+        if (remoteOnboarding != null && preferences.readOnboarding() == null) {
+            preferences.saveOnboarding(remoteOnboarding)
+        }
         screen = Screen.Home
         maybeStartTutorial()
     }
@@ -275,13 +327,13 @@ class AppSession(
             finishTutorial(skipped = false)
         } else {
             tutorial = tutorial.copy(step = tutorial.step + 1, status = TutorialStatus.Started)
-            preferences.saveTutorial(tutorial)
+            persistTutorial()
         }
     }
 
     fun tutorialBack() {
         tutorial = tutorial.copy(step = (tutorial.step - 1).coerceAtLeast(0))
-        preferences.saveTutorial(tutorial)
+        persistTutorial()
     }
 
     fun finishTutorial(skipped: Boolean) {
@@ -289,15 +341,21 @@ class AppSession(
             status = if (skipped) TutorialStatus.Skipped else TutorialStatus.Completed,
             step = if (skipped) tutorial.step else 3,
         )
-        preferences.saveTutorial(tutorial)
+        persistTutorial()
         showTutorialOverlay = false
     }
 
     fun replayTutorial() {
         tutorial = TutorialProgress(status = TutorialStatus.Started, step = 0)
-        preferences.saveTutorial(tutorial)
+        persistTutorial()
         showTutorialOverlay = true
         screen = Screen.Home
+    }
+
+    private fun persistTutorial() {
+        preferences.saveTutorial(tutorial)
+        val uid = user?.takeIf { !it.isGuest }?.uid ?: return
+        runCatching { platformUserStateSync().pushTutorial(uid, tutorial) }
     }
 
     fun formatFare(money: Money): String {
