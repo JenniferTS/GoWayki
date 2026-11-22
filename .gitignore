@@ -13,3 +13,8 @@ iosApp/iosApp.xcodeproj/*
 
 node_modules/
 tool/firebase/node_modules/
+
+# local secrets
+.config/
+**/gowayki-lab-sa.json
+**/*adminsdk*.json

@@ -39,6 +39,9 @@ kotlin {
                 api("androidx.activity:activity-compose:1.7.2")
                 api("androidx.appcompat:appcompat:1.6.1")
                 api("androidx.core:core-ktx:1.10.1")
+                implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+                implementation("com.google.firebase:firebase-auth")
+                implementation("com.google.android.gms:play-services-auth:21.2.0")
             }
         }
         val iosX64Main by getting
