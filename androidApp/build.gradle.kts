@@ -15,6 +15,8 @@ kotlin {
                 implementation("com.google.firebase:firebase-auth")
                 implementation("com.google.firebase:firebase-firestore")
                 implementation("com.google.android.gms:play-services-auth:21.2.0")
+                implementation("com.google.android.gms:play-services-location:21.3.0")
+                implementation("org.maplibre.gl:android-sdk:11.5.2")
             }
         }
     }
@@ -30,8 +32,8 @@ android {
         applicationId = "pe.edu.tecsup.gowayki_lab"
         minSdk = (findProperty("android.minSdk") as String).toInt()
         targetSdk = (findProperty("android.targetSdk") as String).toInt()
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.1.0"
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",

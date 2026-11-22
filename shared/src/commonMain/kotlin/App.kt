@@ -6,6 +6,7 @@ import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
 import pe.edu.tecsup.gowayki.domain.repositories.PlaceSearchRepository
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
+import pe.edu.tecsup.gowayki.ui.screens.ActiveTripScreen
 import pe.edu.tecsup.gowayki.ui.screens.AuthScreen
 import pe.edu.tecsup.gowayki.ui.screens.DetailScreen
 import pe.edu.tecsup.gowayki.ui.screens.GameScreen
@@ -13,6 +14,7 @@ import pe.edu.tecsup.gowayki.ui.screens.HelpScreen
 import pe.edu.tecsup.gowayki.ui.screens.HomeScreen
 import pe.edu.tecsup.gowayki.ui.screens.OnboardingScreen
 import pe.edu.tecsup.gowayki.ui.screens.ProfileScreen
+import pe.edu.tecsup.gowayki.ui.screens.RankingScreen
 import pe.edu.tecsup.gowayki.ui.screens.ReportsScreen
 import pe.edu.tecsup.gowayki.ui.screens.ResultsScreen
 import pe.edu.tecsup.gowayki.ui.screens.SearchScreen
@@ -55,8 +57,10 @@ fun App() {
             Screen.Profile -> ProfileScreen(session)
             Screen.Settings -> SettingsScreen(session)
             Screen.Game -> GameScreen(session)
+            Screen.Ranking -> RankingScreen(session)
             Screen.Help -> HelpScreen(session)
             Screen.Auth -> AuthScreen(session)
+            Screen.ActiveTrip -> ActiveTripScreen(session)
         }
     }
 }
