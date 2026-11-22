@@ -502,6 +502,7 @@ fun HelpScreen(session: AppSession) {
 @Composable
 fun AuthScreen(session: AppSession) {
     val s = session.strings
+    var authError by remember { mutableStateOf<String?>(null) }
     Column(
         Modifier.fillMaxSize().background(GowaykiColors.Ivory).padding(GowaykiSpace.lg),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -510,15 +511,28 @@ fun AuthScreen(session: AppSession) {
         Text(s.signIn, style = MaterialTheme.typography.h5, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
         Button(
-            onClick = { session.signInWithGoogleDemo(isNew = true) },
+            onClick = {
+                authError = null
+                pe.edu.tecsup.gowayki.platform.launchPlatformGoogleSignIn(
+                    onSuccess = { signed ->
+                        session.applyGoogleUser(
+                            uid = signed.uid,
+                            displayName = signed.displayName,
+                            isNew = signed.isNewUser,
+                        )
+                    },
+                    onError = { authError = it },
+                )
+            },
             colors = ButtonDefaults.buttonColors(backgroundColor = GowaykiColors.Terracotta, contentColor = Color.White),
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("${s.signInGoogle} (nuevo)") }
+        ) { Text(s.signInGoogle) }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
-            onClick = { session.signInWithGoogleDemo(isNew = false) },
+            onClick = { session.signInWithGoogleDemo(isNew = true) },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("${s.signInGoogle} (existente)") }
+        ) { Text("${s.signInGoogle} (demo)") }
+        authError?.let { Text(it, color = MaterialTheme.colors.error, modifier = Modifier.padding(top = 8.dp)) }
         TextButton(onClick = { session.go(Screen.Home) }) { Text(s.skip) }
     }
 }

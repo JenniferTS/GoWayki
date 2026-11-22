@@ -234,10 +234,10 @@ class AppSession(
         myReports = reports.mine(user?.uid)
     }
 
-    fun signInWithGoogleDemo(isNew: Boolean) {
+    fun applyGoogleUser(uid: String, displayName: String?, isNew: Boolean) {
         user = AuthUser(
-            uid = if (isNew) "new-google-user" else "existing-google-user",
-            displayName = "Sharon",
+            uid = uid,
+            displayName = displayName,
             isNewRegistration = isNew,
             isGuest = false,
         )
@@ -245,6 +245,14 @@ class AppSession(
         preferences.saveTutorial(tutorial)
         screen = Screen.Home
         maybeStartTutorial()
+    }
+
+    fun signInWithGoogleDemo(isNew: Boolean) {
+        applyGoogleUser(
+            uid = if (isNew) "new-google-user" else "existing-google-user",
+            displayName = "Sharon",
+            isNew = isNew,
+        )
     }
 
     fun signOutToGuest() {
