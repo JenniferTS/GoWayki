@@ -14,6 +14,7 @@ import pe.edu.tecsup.gowayki.domain.game.WeeklyRanking
 import pe.edu.tecsup.gowayki.domain.game.rankingWeek
 import pe.edu.tecsup.gowayki.domain.models.CityStop
 import pe.edu.tecsup.gowayki.domain.models.PlaceResult
+import pe.edu.tecsup.gowayki.domain.models.TransitLine
 import pe.edu.tecsup.gowayki.domain.money.Money
 import pe.edu.tecsup.gowayki.domain.planner.GeoPoint
 import pe.edu.tecsup.gowayki.domain.planner.Itinerary
@@ -31,9 +32,12 @@ import pe.edu.tecsup.gowayki.domain.preferences.AppLocale
 import pe.edu.tecsup.gowayki.domain.preferences.InMemoryPreferencesRepository
 import pe.edu.tecsup.gowayki.domain.preferences.OnboardingStatus
 import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
+import pe.edu.tecsup.gowayki.domain.preferences.RecentTrip
+import pe.edu.tecsup.gowayki.domain.preferences.SavedPlace
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialMigrationPolicy
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialProgress
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialStatus
+import pe.edu.tecsup.gowayki.domain.repositories.CityPackRepository
 import pe.edu.tecsup.gowayki.domain.repositories.PlaceSearchRepository
 import pe.edu.tecsup.gowayki.domain.tracking.PositionFix
 import pe.edu.tecsup.gowayki.domain.tracking.TripAlertKind
@@ -48,9 +52,10 @@ import pe.edu.tecsup.gowayki.platform.platformLastLocation
 import pe.edu.tecsup.gowayki.platform.platformRanking
 import pe.edu.tecsup.gowayki.platform.platformRemoteReports
 import pe.edu.tecsup.gowayki.platform.platformRequestLocationPermission
+import pe.edu.tecsup.gowayki.platform.platformStartTripTracking
+import pe.edu.tecsup.gowayki.platform.platformStopTripTracking
 import pe.edu.tecsup.gowayki.platform.platformTripAlert
 import pe.edu.tecsup.gowayki.platform.platformUserStateSync
-import pe.edu.tecsup.gowayki.platform.platformWatchTripLocation
 
 sealed class Screen {
     data object Splash : Screen()
@@ -67,6 +72,7 @@ sealed class Screen {
     data object Help : Screen()
     data object Auth : Screen()
     data object ActiveTrip : Screen()
+    data object Lines : Screen()
 }
 
 data class AuthUser(
@@ -93,13 +99,20 @@ class AppSession(
     private val reports: ReportsRepository = InMemoryReportsRepository(),
     private val placeSearch: PlaceSearchRepository? = null,
     private val networkProvider: (() -> PlannerNetwork?)? = null,
+    private val cityPackProvider: (() -> CityPackRepository?)? = null,
     deviceLanguage: String? = "es",
     startAsGuest: Boolean = true,
 ) {
     var locale by mutableStateOf(preferences.locale(deviceLanguage))
         private set
     var reduceMotion by mutableStateOf(false)
-    var alarmMode by mutableStateOf(AlarmMode.Sound)
+    var alarmMode by mutableStateOf(
+        when (preferences.readAlarmMode()) {
+            "vibration" -> AlarmMode.Vibration
+            "off" -> AlarmMode.Off
+            else -> AlarmMode.Sound
+        },
+    )
     var screen by mutableStateOf<Screen>(Screen.Splash)
         private set
     var onboardingStep by mutableStateOf(0)
@@ -138,6 +151,14 @@ class AppSession(
     var rankingLoading by mutableStateOf(false)
     var lastGameScore by mutableStateOf(0)
     var lastGameDurationMs by mutableStateOf(0)
+    var pendingScoreCount by mutableStateOf(0)
+    var favorites by mutableStateOf(preferences.readFavorites())
+    var recents by mutableStateOf(preferences.readRecents())
+    var transitLines by mutableStateOf<List<TransitLine>>(emptyList())
+    var selectedLine by mutableStateOf<TransitLine?>(null)
+    var selectedLineGeometry by mutableStateOf<List<GeoPoint>>(emptyList())
+    var mapStopPoints by mutableStateOf<List<GeoPoint>>(emptyList())
+    var locationMessage by mutableStateOf<String?>(null)
 
     private var tracker: TripTracker? = null
     private var stopLocationWatch: (() -> Unit)? = null
@@ -147,10 +168,35 @@ class AppSession(
 
     fun bootstrap() {
         packReady = networkProvider?.invoke() != null
+        refreshPackMapData()
+        pendingScoreCount = preferences.readPendingScores().size
         val onboarding = preferences.readOnboarding()
         screen = if (onboarding == null) Screen.Onboarding else Screen.Home
         maybeStartTutorial()
         refreshNearbyReports()
+        flushPendingScores()
+    }
+
+    fun setAlarm(mode: AlarmMode) {
+        alarmMode = mode
+        preferences.saveAlarmMode(
+            when (mode) {
+                AlarmMode.Sound -> "sound"
+                AlarmMode.Vibration -> "vibration"
+                AlarmMode.Off -> "off"
+            },
+        )
+    }
+
+    fun refreshPackMapData() {
+        val pack = cityPackProvider?.invoke() ?: return
+        runCatching {
+            transitLines = pack.lines().sortedBy { it.shortName }
+            mapStopPoints = pack.mapStops().take(80).map {
+                GeoPoint(it.stop.latitude, it.stop.longitude)
+            }
+            packReady = true
+        }
     }
 
     fun updateLocale(value: AppLocale) {
@@ -171,8 +217,84 @@ class AppSession(
 
     fun go(to: Screen) {
         screen = to
-        if (to == Screen.Home) refreshNearbyReports()
+        if (to == Screen.Home) {
+            refreshNearbyReports()
+            refreshPackMapData()
+        }
         if (to == Screen.Ranking) loadRanking()
+        if (to == Screen.Lines) refreshPackMapData()
+    }
+
+    fun useCurrentLocationAsOrigin() {
+        locationMessage = null
+        platformRequestLocationPermission { granted ->
+            if (!granted) {
+                locationMessage = strings.permissionLocationRationale
+                return@platformRequestLocationPermission
+            }
+            val fix = platformLastLocation()
+            if (fix == null) {
+                locationMessage = strings.errorGeneric
+            } else {
+                origin = GeoPoint(fix.latitude, fix.longitude)
+                originLabel = strings.myLocation
+                originQuery = strings.myLocation
+                locationMessage = null
+            }
+        }
+    }
+
+    fun applyRecent(trip: RecentTrip) {
+        origin = GeoPoint(trip.from.latitude, trip.from.longitude)
+        originLabel = trip.from.name
+        originQuery = trip.from.name
+        destination = GeoPoint(trip.to.latitude, trip.to.longitude)
+        destinationLabel = trip.to.name
+        destinationQuery = trip.to.name
+    }
+
+    fun toggleFavoriteDestination() {
+        val dest = destination ?: return
+        val name = destinationLabel.ifBlank { strings.searchDestination }
+        val place = SavedPlace(name, dest.latitude, dest.longitude)
+        val current = favorites.toMutableList()
+        val idx = current.indexOfFirst {
+            kotlin.math.abs(it.latitude - place.latitude) < 1e-5 &&
+                kotlin.math.abs(it.longitude - place.longitude) < 1e-5
+        }
+        if (idx >= 0) current.removeAt(idx) else current.add(0, place)
+        favorites = current.take(20)
+        preferences.saveFavorites(favorites)
+    }
+
+    fun applyFavorite(place: SavedPlace) {
+        destination = GeoPoint(place.latitude, place.longitude)
+        destinationLabel = place.name
+        destinationQuery = place.name
+    }
+
+    fun selectLine(line: TransitLine) {
+        selectedLine = line
+        val dir = line.ida ?: line.directions.firstOrNull()
+        selectedLineGeometry = dir?.geometry?.mapNotNull { pair ->
+            if (pair.size < 2) null else GeoPoint(pair[0], pair[1])
+        }.orEmpty()
+    }
+
+    fun confirmNearbyReport(reportId: String) {
+        val current = user
+        if (current == null || current.isGuest) {
+            reportMessage = strings.signIn
+            screen = Screen.Auth
+            return
+        }
+        runCatching {
+            val ok = platformRemoteReports()?.confirm(reportId, current.uid) ?: false
+            reportMessage = if (ok) "ok" else strings.alreadyConfirmed
+            refreshNearbyReports()
+        }.onFailure {
+            reportMessage = it.message ?: strings.errorGeneric
+        }
     }
 
     fun searchPlaces(query: String) {
@@ -234,6 +356,7 @@ class AppSession(
                 response.status == JourneyStatus.Success &&
                 response.itineraries.isNotEmpty()
             ) {
+                rememberRecentTrip()
                 screen = Screen.Results
             } else {
                 planError = strings.emptyRoutes
@@ -357,6 +480,7 @@ class AppSession(
         }
         screen = Screen.Home
         maybeStartTutorial()
+        flushPendingScores()
         loadRanking()
     }
 
@@ -441,13 +565,12 @@ class AppSession(
         )
         platformRequestLocationPermission { granted ->
             if (!granted) {
-                // Permite viaje con confirmación manual sin GPS.
                 activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = true)
                 screen = Screen.ActiveTrip
                 return@platformRequestLocationPermission
             }
             stopLocationWatch?.invoke()
-            stopLocationWatch = platformWatchTripLocation { fix -> acceptFix(fix) }
+            stopLocationWatch = platformStartTripTracking { fix -> acceptFix(fix) }
             activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = false)
             screen = Screen.ActiveTrip
         }
@@ -462,6 +585,7 @@ class AppSession(
     fun stopActiveTrip(status: ActiveTripStatus = ActiveTripStatus.Stopped) {
         stopLocationWatch?.invoke()
         stopLocationWatch = null
+        platformStopTripTracking()
         platformClearTripNotifications()
         activeTrip = activeTrip?.copy(status = status)
         tracker = null
@@ -519,30 +643,87 @@ class AppSession(
     fun submitGameScore(score: Int, durationMs: Int) {
         lastGameScore = score
         lastGameDurationMs = durationMs
+        val pending = PendingScore(
+            week = rankingWeek(),
+            score = score.coerceIn(0, 5000),
+            durationMs = durationMs.coerceIn(1000, 120_000),
+        )
+        enqueuePendingScore(pending)
         val current = user
         if (current == null || current.isGuest) {
-            rankingMessage = strings.signIn
-            screen = Screen.Auth
+            rankingMessage = strings.scoreSavedOffline
             return
         }
-        val client = platformRanking()
-        if (client == null) {
-            rankingMessage = strings.errorGeneric
-            return
-        }
-        runCatching {
-            val pending = PendingScore(
-                week = rankingWeek(),
-                score = score.coerceIn(0, 5000),
-                durationMs = durationMs.coerceIn(1000, 120_000),
-            )
-            val name = current.displayName?.ifBlank { null } ?: "Wayki"
-            client.publish(current.uid, name, pending)
+        val published = publishPending(pending, current)
+        if (published) {
+            rankingMessage = null
             loadRanking()
             screen = Screen.Ranking
-        }.onFailure {
-            rankingMessage = it.message ?: strings.errorGeneric
+        } else {
+            rankingMessage = strings.scoreSavedOffline
         }
+    }
+
+    fun flushPendingScores() {
+        val current = user?.takeIf { !it.isGuest } ?: return
+        val lines = preferences.readPendingScores().toMutableList()
+        if (lines.isEmpty()) return
+        val remaining = mutableListOf<String>()
+        for (line in lines) {
+            val parts = line.split('|')
+            if (parts.size != 3) continue
+            val pending = runCatching {
+                PendingScore(parts[0], parts[1].toInt(), parts[2].toInt())
+            }.getOrNull() ?: continue
+            if (!publishPending(pending, current)) remaining.add(line)
+        }
+        preferences.savePendingScores(remaining)
+        pendingScoreCount = remaining.size
+        if (remaining.isEmpty()) loadRanking()
+    }
+
+    private fun enqueuePendingScore(pending: PendingScore) {
+        val line = "${pending.week}|${pending.score}|${pending.durationMs}"
+        val lines = preferences.readPendingScores().toMutableList()
+        lines.removeAll { it.startsWith("${pending.week}|") && it.split('|').getOrNull(1)?.toIntOrNull()?.let { s -> s <= pending.score } == true }
+        val existing = lines.firstOrNull { it.startsWith("${pending.week}|") }
+        if (existing != null) {
+            val oldScore = existing.split('|').getOrNull(1)?.toIntOrNull() ?: -1
+            if (oldScore >= pending.score) {
+                pendingScoreCount = lines.size
+                return
+            }
+            lines.remove(existing)
+        }
+        lines.add(line)
+        preferences.savePendingScores(lines)
+        pendingScoreCount = lines.size
+    }
+
+    private fun publishPending(pending: PendingScore, current: AuthUser): Boolean {
+        val client = platformRanking() ?: return false
+        return runCatching {
+            val name = current.displayName?.ifBlank { null } ?: "Wayki"
+            client.publish(current.uid, name, pending)
+            val left = preferences.readPendingScores().filterNot { it.startsWith("${pending.week}|") }
+            preferences.savePendingScores(left)
+            pendingScoreCount = left.size
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun rememberRecentTrip() {
+        val from = origin ?: return
+        val to = destination ?: return
+        val trip = RecentTrip(
+            from = SavedPlace(originLabel.ifBlank { strings.searchOrigin }, from.latitude, from.longitude),
+            to = SavedPlace(destinationLabel.ifBlank { strings.searchDestination }, to.latitude, to.longitude),
+        )
+        val next = (listOf(trip) + recents.filterNot {
+            it.from.name == trip.from.name && it.to.name == trip.to.name
+        }).take(10)
+        recents = next
+        preferences.saveRecents(next)
     }
 
     fun routeGeometry(trip: Itinerary?): List<GeoPoint> {

@@ -188,7 +188,7 @@ fun HomeScreen(session: AppSession) {
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 TextButton(onClick = { session.go(Screen.Search) }) { Text(s.homeSearchCta) }
-                TextButton(onClick = { session.go(Screen.Search) }) { Text(s.homeRoutes) }
+                TextButton(onClick = { session.go(Screen.Lines) }) { Text(s.linesExplorer) }
                 TextButton(onClick = { session.go(Screen.Reports) }) { Text(s.homeReport) }
                 TextButton(onClick = { session.go(Screen.Profile) }) { Text(s.homeProfile) }
             }
@@ -209,6 +209,8 @@ fun HomeScreen(session: AppSession) {
                         markers = session.nearbyReports.map {
                             pe.edu.tecsup.gowayki.domain.planner.GeoPoint(it.latitude, it.longitude)
                         },
+                        stops = session.mapStopPoints,
+                        route = session.selectedLineGeometry,
                         camera = pe.edu.tecsup.gowayki.domain.planner.GeoPoint(-16.399, -71.537),
                         zoom = 12.0,
                     ),
@@ -225,16 +227,40 @@ fun HomeScreen(session: AppSession) {
                         Text(s.searchHint, color = GowaykiColors.Stone)
                     }
                 }
+                if (session.recents.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(s.recentTrips, fontWeight = FontWeight.SemiBold)
+                    session.recents.take(3).forEach { trip ->
+                        Text(
+                            "${trip.from.name} → ${trip.to.name}",
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                session.applyRecent(trip)
+                                session.go(Screen.Search)
+                            }.padding(vertical = 4.dp),
+                            color = GowaykiColors.Charcoal,
+                            fontSize = 13.sp,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 Text(s.nearbyReports, fontWeight = FontWeight.SemiBold)
                 Text(s.communityDisclaimer, color = GowaykiColors.Stone, fontSize = 13.sp)
                 session.nearbyReports.take(5).forEach { report ->
-                    Text(
-                        "${report.kind.apiValue} · ${report.author.publicId.take(8)}",
-                        color = GowaykiColors.Charcoal,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "${report.kind.apiValue} · 👍${report.confirmations}",
+                            color = GowaykiColors.Charcoal,
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { session.confirmNearbyReport(report.id) }) {
+                            Text(s.confirmReport)
+                        }
+                    }
                 }
             }
             if (session.showTutorialOverlay) {
@@ -319,8 +345,30 @@ fun SearchScreen(session: AppSession) {
             Text(s.noResults, color = GowaykiColors.Stone, modifier = Modifier.padding(8.dp))
         }
         Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { session.useCurrentLocationAsOrigin() }, modifier = Modifier.fillMaxWidth()) {
+            Text(s.myLocation)
+        }
+        session.locationMessage?.let { Text(it, color = MaterialTheme.colors.error, fontSize = 13.sp) }
         OutlinedButton(onClick = { session.useDemoEndpoints() }, modifier = Modifier.fillMaxWidth()) {
             Text("Plaza de Armas → TECSUP")
+        }
+        if (session.favorites.isNotEmpty()) {
+            Text(s.favorites, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+            session.favorites.take(5).forEach { fav ->
+                Text(
+                    fav.name,
+                    modifier = Modifier.fillMaxWidth().clickable { session.applyFavorite(fav) }.padding(vertical = 4.dp),
+                )
+            }
+        }
+        if (session.recents.isNotEmpty()) {
+            Text(s.recentTrips, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+            session.recents.take(5).forEach { trip ->
+                Text(
+                    "${trip.from.name} → ${trip.to.name}",
+                    modifier = Modifier.fillMaxWidth().clickable { session.applyRecent(trip) }.padding(vertical = 4.dp),
+                )
+            }
         }
         Spacer(Modifier.height(8.dp))
         Button(
@@ -400,6 +448,9 @@ fun DetailScreen(session: AppSession) {
             Spacer(Modifier.height(6.dp))
         }
         Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = { session.toggleFavoriteDestination() }, modifier = Modifier.fillMaxWidth()) {
+            Text(s.addFavorite)
+        }
         Button(
             onClick = { session.startActiveTrip() },
             modifier = Modifier.fillMaxWidth(),
@@ -506,6 +557,7 @@ fun ProfileScreen(session: AppSession) {
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { session.go(Screen.Settings) }, modifier = Modifier.fillMaxWidth()) { Text(s.settings) }
         OutlinedButton(onClick = { session.go(Screen.Help) }, modifier = Modifier.fillMaxWidth()) { Text(s.help) }
+        OutlinedButton(onClick = { session.go(Screen.Lines) }, modifier = Modifier.fillMaxWidth()) { Text(s.linesExplorer) }
         OutlinedButton(onClick = { session.go(Screen.Game) }, modifier = Modifier.fillMaxWidth()) { Text(s.gameTitle) }
         OutlinedButton(onClick = { session.go(Screen.Ranking) }, modifier = Modifier.fillMaxWidth()) { Text(s.weeklyRanking) }
         if (session.activeTrip?.running == true) {
@@ -547,7 +599,7 @@ fun SettingsScreen(session: AppSession) {
             ).forEach { (mode, label) ->
                 val selected = session.alarmMode == mode
                 OutlinedButton(
-                    onClick = { session.alarmMode = mode },
+                    onClick = { session.setAlarm(mode) },
                     modifier = Modifier.padding(end = 4.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = if (selected) GowaykiColors.Terracotta else GowaykiColors.Charcoal,
@@ -649,6 +701,58 @@ fun RankingScreen(session: AppSession) {
         }
         if (session.ranking?.top.isNullOrEmpty() && !session.rankingLoading) {
             Text(s.noResults, color = GowaykiColors.Stone)
+        }
+        if (session.pendingScoreCount > 0) {
+            Spacer(Modifier.height(12.dp))
+            Text("${s.pendingScores}: ${session.pendingScoreCount}", color = GowaykiColors.Stone)
+            Button(onClick = { session.flushPendingScores() }) { Text(s.retryScores) }
+        }
+    }
+}
+
+@Composable
+fun LinesScreen(session: AppSession) {
+    val s = session.strings
+    LaunchedEffect(Unit) { session.refreshPackMapData() }
+    Column(Modifier.fillMaxSize().background(GowaykiColors.Ivory).padding(GowaykiSpace.md)) {
+        TextButton(onClick = { session.go(Screen.Home) }) { Text(s.back) }
+        Text(s.linesExplorer, style = MaterialTheme.typography.h5, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        CityMap(
+            modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)),
+            overlay = MapOverlay(
+                route = session.selectedLineGeometry,
+                stops = session.mapStopPoints.take(40),
+                camera = session.selectedLineGeometry.getOrNull(session.selectedLineGeometry.size / 2)
+                    ?: pe.edu.tecsup.gowayki.domain.planner.GeoPoint(-16.399, -71.537),
+                zoom = 12.5,
+            ),
+        )
+        Spacer(Modifier.height(8.dp))
+        if (session.transitLines.isEmpty()) {
+            Text(s.loading, color = GowaykiColors.Stone)
+        } else {
+            LazyColumn {
+                itemsIndexed(session.transitLines) { _, line ->
+                    val selected = session.selectedLine?.id == line.id
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable {
+                            session.selectLine(line)
+                        },
+                        color = if (selected) GowaykiColors.Sand else Color.White,
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(line.shortName, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                line.ida?.headsign ?: line.directions.firstOrNull()?.headsign.orEmpty(),
+                                color = GowaykiColors.Stone,
+                                fontSize = 13.sp,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

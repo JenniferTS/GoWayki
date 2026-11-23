@@ -115,6 +115,25 @@ actual fun platformWatchTripLocation(onFix: (PositionFix) -> Unit): () -> Unit {
     }
 }
 
+actual fun platformStartTripTracking(onFix: (PositionFix) -> Unit): () -> Unit {
+    val act = AndroidPlatformHost.activity ?: return platformWatchTripLocation(onFix)
+    TripLocationHub.onFix = onFix
+    runCatching { TripTrackingService.start(act.applicationContext) }
+        .onFailure {
+            TripLocationHub.onFix = null
+            return platformWatchTripLocation(onFix)
+        }
+    return {
+        platformStopTripTracking()
+    }
+}
+
+actual fun platformStopTripTracking() {
+    TripLocationHub.onFix = null
+    val act = AndroidPlatformHost.activity ?: return
+    runCatching { TripTrackingService.stop(act.applicationContext) }
+}
+
 private fun vibrate(context: Context) {
     try {
         if (Build.VERSION.SDK_INT >= 31) {

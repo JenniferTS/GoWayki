@@ -118,6 +118,36 @@ class FirestoreReportsClient(
         return snap.documents.mapNotNull { it.toCommunityReport() }
     }
 
+    override fun confirm(reportId: String, uid: String): Boolean {
+        requireRealAccount(uid)
+        val doc = db.collection("reports").document(reportId)
+        val marker = doc.collection("confirmations").document(uid)
+        val index = db.collection("users").document(uid)
+            .collection("confirmationRefs").document(reportId)
+        return db.runTransaction { tx ->
+            val report = tx.get(doc)
+            val vote = tx.get(marker)
+            if (auth.currentUser?.uid != uid) error("Session changed")
+            if (!report.exists()) error("Reporte no existe")
+            val created = report.getTimestamp("createdAt")
+                ?: error("Sin fecha")
+            val expiresMs = created.toDate().time + 72L * 3_600_000L
+            if (expiresMs <= System.currentTimeMillis()) error("Reporte vencido")
+            if (vote.exists()) return@runTransaction false
+            val count = (report.getLong("confirmations") ?: 0L).toInt()
+            tx.update(doc, "confirmations", count + 1)
+            tx.set(
+                marker,
+                mapOf(
+                    "uid" to uid,
+                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+                ),
+            )
+            tx.set(index, mapOf("id" to reportId))
+            true
+        }.await(15)
+    }
+
     private fun requireRealAccount(uid: String) {
         val user = auth.currentUser
         if (user == null || user.isAnonymous || user.uid != uid) {
