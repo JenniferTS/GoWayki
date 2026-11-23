@@ -11,6 +11,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,6 +51,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -57,7 +60,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiFonts
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiMotion
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiRadius
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiSpace
@@ -122,6 +127,31 @@ fun EnterContent(
     ) { content() }
 }
 
+/** Entrada escalonada (cards, chips, pasos). */
+@Composable
+fun StaggerIn(
+    index: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val reduce = LocalMotionPrefs.current.reduceMotion
+    var visible by remember { mutableStateOf(reduce) }
+    LaunchedEffect(index) {
+        if (!reduce) delay((index * GowaykiMotion.StaggerMs).toLong().coerceAtMost(360))
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(if (reduce) GowaykiMotion.none() else GowaykiMotion.soft()) +
+            slideInHorizontally(
+                animationSpec = if (reduce) GowaykiMotion.none() else GowaykiMotion.soft(),
+                initialOffsetX = { if (reduce) 0 else 28 },
+            ),
+        exit = fadeOut(GowaykiMotion.micro()),
+    ) { content() }
+}
+
 @Composable
 fun BrandMark(
     subtitle: String? = null,
@@ -131,18 +161,32 @@ fun BrandMark(
 ) {
     val ink = if (light) Color.White else GowaykiColors.BrandInk
     val go = if (light) Color(0xFFFFC4A3) else GowaykiColors.BrandOrange
+    val reduce = LocalMotionPrefs.current.reduceMotion
+    val logoScale = remember { Animatable(if (reduce) 1f else 0.82f) }
+    LaunchedEffect(Unit) {
+        if (!reduce) {
+            logoScale.animateTo(1f, GowaykiMotion.snappy())
+        }
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (showLogo) {
-            BrandLogo(size = if (large) 58.dp else 40.dp)
+            BrandLogo(
+                size = if (large) 58.dp else 40.dp,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = logoScale.value
+                    scaleY = logoScale.value
+                },
+            )
             Spacer(Modifier.size(10.dp))
         }
         Column {
+            // Wordmark: Righteous (display del manual)
             Text(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(color = go, fontWeight = FontWeight.Black)) { append("go") }
-                    withStyle(SpanStyle(color = ink, fontWeight = FontWeight.Black)) { append("wayki") }
+                    withStyle(SpanStyle(color = go, fontFamily = GowaykiFonts.Display)) { append("go") }
+                    withStyle(SpanStyle(color = ink, fontFamily = GowaykiFonts.Display)) { append("wayki") }
                     append(" ")
-                    withStyle(SpanStyle(color = go, fontWeight = FontWeight.Bold)) { append("go") }
+                    withStyle(SpanStyle(color = go, fontFamily = GowaykiFonts.Display)) { append("go") }
                 },
                 style = if (large) MaterialTheme.typography.h3 else MaterialTheme.typography.h4,
             )
@@ -381,6 +425,7 @@ fun BottomNavBar(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         item.label,
+                        style = MaterialTheme.typography.caption,
                         color = if (active) GowaykiColors.BrandOrange else GowaykiColors.Stone,
                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                         fontSize = 11.sp,

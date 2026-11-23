@@ -1,6 +1,8 @@
 package pe.edu.tecsup.gowayki.ui.theme
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.MaterialTheme
@@ -12,7 +14,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,7 +21,7 @@ import androidx.compose.ui.unit.sp
 /**
  * Identidad visual GoWayki Go (manual + hoja de marca).
  * Primarios: #F05709 / #292929 · acentos: #F98E00 / #E84513 / #BC5433
- * Tipografías de marca: Righteous / Ubuntu / Poppins → Sans del sistema (peso lúdico).
+ * Tipografías (manual): Righteous · Ubuntu · Poppins.
  */
 object GowaykiColors {
     /** Naranja corporativo principal. */
@@ -55,10 +56,16 @@ object GowaykiMotion {
     const val MicroMs = 160
     const val TransitionMs = 280
     const val EmphasizedMs = 420
+    const val StaggerMs = 55
 
     fun <T> soft() = tween<T>(TransitionMs, easing = FastOutSlowInEasing)
     fun <T> micro() = tween<T>(MicroMs, easing = FastOutSlowInEasing)
+    fun <T> emphasized() = tween<T>(EmphasizedMs, easing = FastOutSlowInEasing)
     fun <T> none() = tween<T>(0)
+    fun <T> snappy() = spring<T>(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
 }
 
 object GowaykiSpace {
@@ -81,65 +88,71 @@ data class MotionPrefs(val reduceMotion: Boolean = false)
 
 val LocalMotionPrefs = staticCompositionLocalOf { MotionPrefs() }
 
+/**
+ * Escala tipográfica del manual:
+ * - Righteous → display / wordmark (h3–h4)
+ * - Ubuntu → títulos de UI y cuerpo (h5–body)
+ * - Poppins → énfasis secundario (subtitle / button / caption)
+ */
 private val BrandTypography = Typography(
     h3 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Black,
+        fontFamily = GowaykiFonts.Display,
+        fontWeight = FontWeight.Normal,
         fontSize = 34.sp,
         lineHeight = 40.sp,
-        letterSpacing = (-0.4).sp,
+        letterSpacing = 0.sp,
         color = GowaykiColors.Charcoal,
     ),
     h4 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
+        fontFamily = GowaykiFonts.Display,
+        fontWeight = FontWeight.Normal,
         fontSize = 28.sp,
         lineHeight = 34.sp,
         color = GowaykiColors.Charcoal,
     ),
     h5 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = GowaykiFonts.Primary,
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
         color = GowaykiColors.Charcoal,
     ),
     h6 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = GowaykiFonts.Primary,
+        fontWeight = FontWeight.Medium,
         fontSize = 18.sp,
         lineHeight = 24.sp,
         color = GowaykiColors.Charcoal,
     ),
     subtitle1 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Medium,
+        fontFamily = GowaykiFonts.Secondary,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 22.sp,
         color = GowaykiColors.Charcoal,
     ),
     body1 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = GowaykiFonts.Primary,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         color = GowaykiColors.Charcoal,
     ),
     body2 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = GowaykiFonts.Primary,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         color = GowaykiColors.Stone,
     ),
     button = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = GowaykiFonts.Secondary,
         fontWeight = FontWeight.Bold,
         fontSize = 15.sp,
-        letterSpacing = 0.3.sp,
+        letterSpacing = 0.2.sp,
     ),
     caption = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = GowaykiFonts.Secondary,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
