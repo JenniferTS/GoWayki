@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Button
-import androidx.compose.material.OutlinedButton
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
@@ -23,13 +23,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
+import pe.edu.tecsup.gowayki.ui.components.AtmosphereBackground
+import pe.edu.tecsup.gowayki.ui.components.EnterContent
+import pe.edu.tecsup.gowayki.ui.components.GlassPanel
+import pe.edu.tecsup.gowayki.ui.components.PrimaryButton
+import pe.edu.tecsup.gowayki.ui.components.SoftButton
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiRadius
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiSpace
 import kotlin.random.Random
 
@@ -71,65 +80,90 @@ fun GameScreen(session: AppSession) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(GowaykiColors.Ivory).padding(GowaykiSpace.md)) {
-        TextButton(onClick = {
-            running = false
-            session.go(Screen.Home)
-        }) { Text(s.back) }
-        Text(s.gameTitle)
-        Text("${s.gameScore}: $score")
-        Text(s.gameHelp, color = GowaykiColors.Stone)
-        Spacer(Modifier.height(8.dp))
-        Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-                .background(Color(0xFF1C2A24), RoundedCornerShape(16.dp))
-                .pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        busX = (offset.x / size.width).coerceIn(0.08f, 0.92f)
-                        score += 1
+    AtmosphereBackground {
+        EnterContent(Modifier.padding(GowaykiSpace.md).fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
+                TextButton(onClick = {
+                    running = false
+                    session.go(Screen.Home)
+                }) { Text(s.back) }
+                Text(s.gameTitle, style = MaterialTheme.typography.h4, color = GowaykiColors.Terracotta)
+                Text(
+                    "${s.gameScore}: $score",
+                    style = MaterialTheme.typography.h5,
+                    fontWeight = FontWeight.Bold,
+                    color = GowaykiColors.Charcoal,
+                )
+                Text(s.gameHelp, color = GowaykiColors.Stone, style = MaterialTheme.typography.body2)
+                Spacer(Modifier.height(12.dp))
+                GlassPanel {
+                    Canvas(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(320.dp)
+                            .clip(RoundedCornerShape(GowaykiRadius.md))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF1A2E26), Color(0xFF0F1A16)),
+                                ),
+                            )
+                            .pointerInput(Unit) {
+                                detectTapGestures { offset ->
+                                    busX = (offset.x / size.width).coerceIn(0.08f, 0.92f)
+                                    score += 1
+                                }
+                            },
+                    ) {
+                        obstacles.forEach { (x, y) ->
+                            drawCircle(
+                                Color(0xFFE9D8C2),
+                                radius = 18f,
+                                center = Offset(x * size.width, y * size.height),
+                            )
+                        }
+                        drawRoundRect(
+                            color = GowaykiColors.Terracotta,
+                            topLeft = Offset(busX * size.width - 28f, size.height * 0.82f),
+                            size = androidx.compose.ui.geometry.Size(56f, 28f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f),
+                        )
                     }
-                },
-        ) {
-            obstacles.forEach { (x, y) ->
-                drawCircle(Color(0xFFE9D8C2), radius = 18f, center = Offset(x * size.width, y * size.height))
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth()) {
+                    SoftButton(
+                        text = if (paused) s.gameResume else s.gamePause,
+                        onClick = { paused = !paused },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    SoftButton(
+                        text = s.gameRestart,
+                        onClick = {
+                            score = 0
+                            obstacles = listOf(0.2f to 0f, 0.7f to -0.4f)
+                            busX = 0.5f
+                            paused = false
+                            elapsedMs = 0
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                PrimaryButton(
+                    text = s.gameSubmitScore,
+                    onClick = {
+                        running = false
+                        val duration = elapsedMs.coerceIn(1000, 120_000)
+                        val publishScore = score.coerceIn(0, 5000).coerceAtMost(duration / 1000 * 30 + 30)
+                        session.submitGameScore(publishScore, duration)
+                    },
+                )
+                SoftButton(text = s.weeklyRanking, onClick = { session.go(Screen.Ranking) })
+                session.rankingMessage?.let {
+                    Text(it, color = MaterialTheme.colors.error, modifier = Modifier.padding(top = 8.dp))
+                }
             }
-            drawRoundRect(
-                color = GowaykiColors.Terracotta,
-                topLeft = Offset(busX * size.width - 28f, size.height * 0.82f),
-                size = androidx.compose.ui.geometry.Size(56f, 28f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f),
-            )
         }
-        Spacer(Modifier.height(8.dp))
-        Row {
-            Button(onClick = { paused = !paused }) {
-                Text(if (paused) s.gameResume else s.gamePause)
-            }
-            Spacer(Modifier.padding(8.dp))
-            OutlinedButton(onClick = {
-                score = 0
-                obstacles = listOf(0.2f to 0f, 0.7f to -0.4f)
-                busX = 0.5f
-                paused = false
-                elapsedMs = 0
-            }) { Text(s.gameRestart) }
-        }
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = {
-                running = false
-                val duration = elapsedMs.coerceIn(1000, 120_000)
-                val publishScore = score.coerceIn(0, 5000).coerceAtMost(duration / 1000 * 30 + 30)
-                session.submitGameScore(publishScore, duration)
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(s.gameSubmitScore) }
-        OutlinedButton(
-            onClick = { session.go(Screen.Ranking) },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(s.weeklyRanking) }
-        session.rankingMessage?.let { Text(it, color = Color(0xFFB00020)) }
     }
 }

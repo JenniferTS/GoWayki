@@ -1,3 +1,10 @@
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import pe.edu.tecsup.gowayki.domain.planner.PlannerNetwork
@@ -22,7 +29,9 @@ import pe.edu.tecsup.gowayki.ui.screens.ResultsScreen
 import pe.edu.tecsup.gowayki.ui.screens.SearchScreen
 import pe.edu.tecsup.gowayki.ui.screens.SettingsScreen
 import pe.edu.tecsup.gowayki.ui.screens.SplashScreen
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiMotion
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiTheme
+import pe.edu.tecsup.gowayki.ui.theme.LocalMotionPrefs
 
 data class GowaykiRuntime(
     val deviceLanguage: String? = "es",
@@ -38,6 +47,7 @@ fun installGowaykiRuntime(runtime: GowaykiRuntime) {
     runtimeHolder = runtime
 }
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun App() {
     val session = remember {
@@ -50,22 +60,35 @@ fun App() {
         )
     }
     GowaykiTheme(reduceMotion = session.reduceMotion) {
-        when (val screen = session.screen) {
-            Screen.Splash -> SplashScreen(session)
-            Screen.Onboarding -> OnboardingScreen(session)
-            Screen.Home -> HomeScreen(session)
-            Screen.Search -> SearchScreen(session)
-            Screen.Results -> ResultsScreen(session)
-            is Screen.Detail -> DetailScreen(session)
-            Screen.Reports -> ReportsScreen(session)
-            Screen.Profile -> ProfileScreen(session)
-            Screen.Settings -> SettingsScreen(session)
-            Screen.Game -> GameScreen(session)
-            Screen.Ranking -> RankingScreen(session)
-            Screen.Help -> HelpScreen(session)
-            Screen.Auth -> AuthScreen(session)
-            Screen.ActiveTrip -> ActiveTripScreen(session)
-            Screen.Lines -> LinesScreen(session)
+        val reduce = LocalMotionPrefs.current.reduceMotion
+        AnimatedContent(
+            targetState = session.screen,
+            transitionSpec = {
+                if (reduce) {
+                    fadeIn(GowaykiMotion.none()) togetherWith fadeOut(GowaykiMotion.none())
+                } else {
+                    (fadeIn(GowaykiMotion.soft()) + slideInHorizontally { it / 12 }) togetherWith
+                        (fadeOut(GowaykiMotion.micro()) + slideOutHorizontally { -it / 16 })
+                }
+            },
+        ) { screen ->
+            when (screen) {
+                Screen.Splash -> SplashScreen(session)
+                Screen.Onboarding -> OnboardingScreen(session)
+                Screen.Home -> HomeScreen(session)
+                Screen.Search -> SearchScreen(session)
+                Screen.Results -> ResultsScreen(session)
+                is Screen.Detail -> DetailScreen(session)
+                Screen.Reports -> ReportsScreen(session)
+                Screen.Profile -> ProfileScreen(session)
+                Screen.Settings -> SettingsScreen(session)
+                Screen.Game -> GameScreen(session)
+                Screen.Ranking -> RankingScreen(session)
+                Screen.Help -> HelpScreen(session)
+                Screen.Auth -> AuthScreen(session)
+                Screen.ActiveTrip -> ActiveTripScreen(session)
+                Screen.Lines -> LinesScreen(session)
+            }
         }
     }
 }
