@@ -729,8 +729,23 @@ class AppSession(
     fun routeGeometry(trip: Itinerary?): List<GeoPoint> {
         if (trip == null) return emptyList()
         return trip.legs.flatMap { leg ->
-            if (leg.geometry.size >= 2) leg.geometry else listOf(leg.from, leg.to)
+            when {
+                leg.geometry.size >= 2 -> leg.geometry
+                leg is TransitLeg && leg.intermediateStops.isNotEmpty() -> {
+                    listOf(leg.from) +
+                        leg.intermediateStops.map { GeoPoint(it.latitude, it.longitude) } +
+                        listOf(leg.to)
+                }
+                else -> listOf(leg.from, leg.to)
+            }
         }
+    }
+
+    fun routeEndpoints(trip: Itinerary?): List<GeoPoint> {
+        if (trip == null) return emptyList()
+        val from = trip.legs.firstOrNull()?.from ?: return emptyList()
+        val to = trip.legs.lastOrNull()?.to ?: return emptyList()
+        return listOf(from, to)
     }
 
     private fun demoJourney(from: GeoPoint, to: GeoPoint): JourneyResponse {

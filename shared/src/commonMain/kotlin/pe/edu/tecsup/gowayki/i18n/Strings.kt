@@ -102,6 +102,7 @@ data class Strings(
     val scoreSavedOffline: String,
     val retryScores: String,
     val pendingScores: String,
+    val viewDetail: String,
 )
 
 object StringCatalog {
@@ -205,6 +206,7 @@ object StringCatalog {
         scoreSavedOffline = "Puntaje guardado offline; se publicará al conectar.",
         retryScores = "Reintentar puntajes",
         pendingScores = "Puntajes pendientes",
+        viewDetail = "Ver detalle de la ruta",
     )
 
     private val en = Strings(
@@ -307,6 +309,7 @@ object StringCatalog {
         scoreSavedOffline = "Score saved offline; it will publish when online.",
         retryScores = "Retry scores",
         pendingScores = "Pending scores",
+        viewDetail = "View route details",
     )
 
     fun forLocale(locale: AppLocale): Strings = when (locale) {

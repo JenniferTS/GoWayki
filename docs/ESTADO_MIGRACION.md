@@ -1,6 +1,6 @@
 # GoWayki KMP — estado de migración
 
-Actualizado: 2026-11-23 (rediseño UI + motion)  
+Actualizado: 2026-11-23 (botones lúdicos + rutas en mapa)  
 Rama: `feat/kmp-migration` → https://github.com/JenniferTS/GoWayki/tree/feat/kmp-migration  
 Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
@@ -12,19 +12,20 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 | Auth Google + tutorial sync | Implementado |
 | Reportes Firestore + votos/confirmaciones | Implementado |
 | MapLibre offline + paraderos/reportes/línea | Implementado |
+| Rutas marcadas (casing + fit bounds + preview) | Implementado |
 | Origen = mi ubicación | Implementado |
 | Favoritos / viajes recientes | Implementado |
 | Explorador de líneas | Implementado |
 | Viaje activo + foreground service | Implementado |
 | Ranking + cola offline de scores | Implementado |
 | Baseline Profiles | Implementado |
-| UI brand + animaciones (Atmosphere/Enter/Glass) | Implementado |
+| UI brand + botones pill con press/shimmer | Implementado |
 | iOS shell | Docs + stubs (Mac) |
 | Ilustraciones micros en APK | **No** (a propósito, peso) |
 
 ## Versión
 
-APK debug **1.3.0** (`versionCode` 6).
+APK debug **1.3.1** (`versionCode` 7).
 
 ```bash
 export ANDROID_HOME=/home/agentes/android-sdk

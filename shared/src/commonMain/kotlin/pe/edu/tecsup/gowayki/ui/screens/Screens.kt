@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -421,6 +422,8 @@ fun SearchScreen(session: AppSession) {
 fun ResultsScreen(session: AppSession) {
     val s = session.strings
     val list = session.journey?.itineraries.orEmpty()
+    var previewIndex by remember { mutableStateOf(0) }
+    val preview = list.getOrNull(previewIndex.coerceAtMost(list.lastIndex.coerceAtLeast(0)))
     AtmosphereBackground {
         EnterContent(Modifier.padding(GowaykiSpace.md).fillMaxSize()) {
             Column {
@@ -429,24 +432,64 @@ fun ResultsScreen(session: AppSession) {
                     Text(session.planError ?: s.emptyRoutes, color = GowaykiColors.Stone)
                     PrimaryButton(s.retry, onClick = { session.go(Screen.Search) })
                 } else {
-                    LazyColumn {
+                    CityMap(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(GowaykiRadius.lg)),
+                        overlay = MapOverlay(
+                            route = session.routeGeometry(preview),
+                            markers = session.routeEndpoints(preview),
+                            zoom = 12.8,
+                        ),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    LazyColumn(Modifier.weight(1f)) {
                         itemsIndexed(list) { index, trip ->
+                            val selected = index == previewIndex
                             GlassPanel(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                onClick = { session.openDetail(index) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .then(
+                                        if (selected) {
+                                            Modifier.border(
+                                                2.dp,
+                                                GowaykiColors.Terracotta.copy(alpha = 0.55f),
+                                                RoundedCornerShape(GowaykiRadius.lg),
+                                            )
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
+                                onClick = { previewIndex = index },
                             ) {
                                 Text(
                                     "${trip.durationMinutes.toInt()} ${s.minutesApprox} · ${trip.transfers} ${s.transfers}",
                                     fontWeight = FontWeight.SemiBold,
                                     style = MaterialTheme.typography.h6,
+                                    color = if (selected) GowaykiColors.Terracotta else GowaykiColors.Charcoal,
                                 )
                                 Text(
                                     "${s.walking}: ${trip.walkingMinutes.toInt()} min · ${s.fareEstimated}: ${session.formatFare(trip.estimatedFare)}",
                                     color = GowaykiColors.Stone,
                                 )
+                                trip.legs.filterIsInstance<TransitLeg>().forEach { leg ->
+                                    Text(
+                                        "${leg.lineName} → ${leg.headsign}",
+                                        color = GowaykiColors.Charcoal,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                    )
+                                }
                             }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    PrimaryButton(
+                        text = s.viewDetail,
+                        onClick = { session.openDetail(previewIndex) },
+                    )
                 }
             }
         }
@@ -468,10 +511,14 @@ fun DetailScreen(session: AppSession) {
                 Text(session.formatFare(trip.estimatedFare), style = MaterialTheme.typography.h4, color = GowaykiColors.Terracotta)
                 Spacer(Modifier.height(10.dp))
                 CityMap(
-                    modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(GowaykiRadius.lg)),
+                    modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(GowaykiRadius.lg)),
                     overlay = MapOverlay(
                         route = session.routeGeometry(trip),
-                        camera = trip.legs.firstOrNull()?.from,
+                        markers = session.routeEndpoints(trip),
+                        stops = trip.legs.filterIsInstance<TransitLeg>().flatMap { leg ->
+                            (listOf(leg.boardingStop) + leg.intermediateStops + listOf(leg.alightingStop))
+                                .map { pe.edu.tecsup.gowayki.domain.planner.GeoPoint(it.latitude, it.longitude) }
+                        },
                         zoom = 13.0,
                     ),
                 )
