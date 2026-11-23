@@ -6,11 +6,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 
 data class LocationFix(val latitude: Double, val longitude: Double, val accuracyMeters: Float?)
 
-/** Una lectura puntual; no inicia seguimiento continuo. */
 object AndroidLocationFix {
     fun hasPermission(context: Context): Boolean {
         val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -18,11 +21,23 @@ object AndroidLocationFix {
         return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
     }
 
+    fun isLocationEnabled(context: Context): Boolean {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return runCatching {
+            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }.getOrDefault(false)
+    }
+
     @SuppressLint("MissingPermission")
     fun lastKnown(context: Context): LocationFix? {
         if (!hasPermission(context)) return null
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        val providers = listOf(
+            LocationManager.GPS_PROVIDER,
+            LocationManager.NETWORK_PROVIDER,
+            LocationManager.PASSIVE_PROVIDER,
+        )
         var best: Location? = null
         for (p in providers) {
             val loc = runCatching { lm.getLastKnownLocation(p) }.getOrNull() ?: continue
@@ -30,5 +45,51 @@ object AndroidLocationFix {
         }
         val loc = best ?: return null
         return LocationFix(loc.latitude, loc.longitude, loc.accuracy)
+    }
+
+    @SuppressLint("MissingPermission")
+    fun fetchCurrent(context: Context, onResult: (LocationFix?) -> Unit) {
+        if (!hasPermission(context)) {
+            onResult(null)
+            return
+        }
+        if (!isLocationEnabled(context)) {
+            onResult(null)
+            return
+        }
+        val client = LocationServices.getFusedLocationProviderClient(context)
+        val cts = CancellationTokenSource()
+        client.lastLocation
+            .addOnSuccessListener { last ->
+                if (last != null && last.accuracy <= 80f && ageMs(last) < 60_000L) {
+                    onResult(LocationFix(last.latitude, last.longitude, last.accuracy))
+                } else {
+                    client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                        .addOnSuccessListener { loc ->
+                            when {
+                                loc != null -> onResult(LocationFix(loc.latitude, loc.longitude, loc.accuracy))
+                                last != null -> onResult(LocationFix(last.latitude, last.longitude, last.accuracy))
+                                else -> onResult(lastKnown(context))
+                            }
+                        }
+                        .addOnFailureListener {
+                            onResult(
+                                last?.let { LocationFix(it.latitude, it.longitude, it.accuracy) }
+                                    ?: lastKnown(context),
+                            )
+                        }
+                }
+            }
+            .addOnFailureListener {
+                client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                    .addOnSuccessListener { loc ->
+                        onResult(loc?.let { LocationFix(it.latitude, it.longitude, it.accuracy) } ?: lastKnown(context))
+                    }
+                    .addOnFailureListener { onResult(lastKnown(context)) }
+            }
+    }
+
+    private fun ageMs(loc: Location): Long {
+        return SystemClock.elapsedRealtime() - loc.elapsedRealtimeNanos / 1_000_000L
     }
 }

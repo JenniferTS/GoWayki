@@ -51,9 +51,53 @@ actual fun platformLastLocation(): PlatformLocation? {
     return PlatformLocation(fix.latitude, fix.longitude)
 }
 
+actual fun platformFetchCurrentLocation(onResult: (PlatformLocation?) -> Unit) {
+    val act = AndroidPlatformHost.activity
+    if (act == null) {
+        onResult(null)
+        return
+    }
+    AndroidLocationFix.fetchCurrent(act) { fix ->
+        onResult(fix?.let { PlatformLocation(it.latitude, it.longitude) })
+    }
+}
+
+actual fun platformIsLocationEnabled(): Boolean {
+    val act = AndroidPlatformHost.activity ?: return false
+    return AndroidLocationFix.isLocationEnabled(act)
+}
+
 actual fun platformRequestLocationPermission(onResult: (Boolean) -> Unit) {
     val req = AndroidPlatformHost.requestLocation
     if (req == null) onResult(false) else req(onResult)
+}
+
+actual fun platformWatchUserLocation(onFix: (PlatformLocation) -> Unit): () -> Unit {
+    val act = AndroidPlatformHost.activity ?: return { }
+    if (!AndroidLocationFix.hasPermission(act)) return { }
+    val client = LocationServices.getFusedLocationProviderClient(act)
+    val request = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 4_000L)
+        .setMinUpdateIntervalMillis(2_500L)
+        .setMinUpdateDistanceMeters(8f)
+        .build()
+    val callback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            val loc = result.lastLocation ?: return
+            onFix(PlatformLocation(loc.latitude, loc.longitude))
+        }
+    }
+    try {
+        client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+        // Empuja un fix inmediato si hay lastLocation
+        client.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null) onFix(PlatformLocation(loc.latitude, loc.longitude))
+        }
+    } catch (_: SecurityException) {
+        return { }
+    }
+    return {
+        runCatching { client.removeLocationUpdates(callback) }
+    }
 }
 
 actual fun platformTripAlert(title: String, body: String, mode: AlarmMode) {

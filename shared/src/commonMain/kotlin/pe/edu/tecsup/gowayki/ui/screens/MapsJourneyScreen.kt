@@ -25,6 +25,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +63,12 @@ fun MapsJourneyScreen(session: AppSession) {
     val list = session.journey?.itineraries.orEmpty()
     var selected by remember { mutableStateOf(0) }
     var sheetExpanded by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        session.startUserLocationWatch(setOriginIfEmpty = session.origin == null)
+    }
+    DisposableEffect(Unit) {
+        onDispose { session.stopUserLocationWatch() }
+    }
     LaunchedEffect(list.size) {
         selected = 0
         if (list.isNotEmpty()) session.selectItinerary(0)
@@ -80,6 +87,7 @@ fun MapsJourneyScreen(session: AppSession) {
                 markers = ends,
                 user = session.lastKnownLocation,
                 zoom = 13.2,
+                followEpoch = session.locationFollowEpoch,
             ),
         )
 
@@ -116,7 +124,7 @@ fun MapsJourneyScreen(session: AppSession) {
             }
         }
 
-        // Recenter FAB
+        // Recenter FAB — pide GPS fresco y centra cámara en el usuario
         Box(
             Modifier
                 .align(Alignment.BottomEnd)
@@ -125,10 +133,23 @@ fun MapsJourneyScreen(session: AppSession) {
                 .shadow(8.dp, CircleShape)
                 .clip(CircleShape)
                 .background(Color.White)
-                .clickable { session.useCurrentLocationAsOrigin() },
+                .clickable { session.recenterOnUser() },
             contentAlignment = Alignment.Center,
         ) {
             Icon(GowaykiIcons.Location, contentDescription = s.myLocation, tint = GowaykiColors.BrandOrange, modifier = Modifier.size(22.dp))
+        }
+
+        session.locationMessage?.let { msg ->
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 96.dp, start = 24.dp, end = 24.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White,
+                elevation = 6.dp,
+            ) {
+                Text(msg, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), fontSize = 13.sp, color = GowaykiColors.BrandInk)
+            }
         }
 
         // Bottom sheet

@@ -27,7 +27,7 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
 ## Versión
 
-APK debug **1.5.0** (`versionCode` 10).
+APK debug **1.5.1** (`versionCode` 11) — GPS Fused + watch + auto-origen. Anterior: 1.5.0 (`versionCode` 10).
 
 ```bash
 export ANDROID_HOME=/home/agentes/android-sdk

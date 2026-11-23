@@ -34,8 +34,8 @@ android {
         applicationId = "pe.edu.tecsup.gowayki_lab"
         minSdk = (findProperty("android.minSdk") as String).toInt()
         targetSdk = (findProperty("android.targetSdk") as String).toInt()
-        versionCode = 10
-        versionName = "1.5.0"
+        versionCode = 11
+        versionName = "1.5.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

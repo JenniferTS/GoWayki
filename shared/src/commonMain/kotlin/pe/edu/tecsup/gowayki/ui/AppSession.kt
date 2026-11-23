@@ -47,7 +47,10 @@ import pe.edu.tecsup.gowayki.domain.tracking.TripTracker
 import pe.edu.tecsup.gowayki.i18n.StringCatalog
 import pe.edu.tecsup.gowayki.i18n.Strings
 import pe.edu.tecsup.gowayki.platform.AlarmMode
+import pe.edu.tecsup.gowayki.platform.PlatformLocation
 import pe.edu.tecsup.gowayki.platform.platformClearTripNotifications
+import pe.edu.tecsup.gowayki.platform.platformFetchCurrentLocation
+import pe.edu.tecsup.gowayki.platform.platformIsLocationEnabled
 import pe.edu.tecsup.gowayki.platform.platformLastLocation
 import pe.edu.tecsup.gowayki.platform.platformRanking
 import pe.edu.tecsup.gowayki.platform.platformRemoteReports
@@ -56,6 +59,7 @@ import pe.edu.tecsup.gowayki.platform.platformStartTripTracking
 import pe.edu.tecsup.gowayki.platform.platformStopTripTracking
 import pe.edu.tecsup.gowayki.platform.platformTripAlert
 import pe.edu.tecsup.gowayki.platform.platformUserStateSync
+import pe.edu.tecsup.gowayki.platform.platformWatchUserLocation
 
 sealed class Screen {
     data object Splash : Screen()
@@ -161,9 +165,13 @@ class AppSession(
     var selectedLineGeometry by mutableStateOf<List<GeoPoint>>(emptyList())
     var mapStopPoints by mutableStateOf<List<GeoPoint>>(emptyList())
     var locationMessage by mutableStateOf<String?>(null)
+    var locating by mutableStateOf(false)
+    /** Sube al tocar “mi ubicación” para recentrar el mapa. */
+    var locationFollowEpoch by mutableStateOf(0L)
 
     private var tracker: TripTracker? = null
     private var stopLocationWatch: (() -> Unit)? = null
+    private var stopUserLocationWatchHandle: (() -> Unit)? = null
 
     val strings: Strings get() = StringCatalog.forLocale(locale)
     val baseFare: Money get() = Money.BASE
@@ -177,6 +185,7 @@ class AppSession(
         maybeStartTutorial()
         refreshNearbyReports()
         flushPendingScores()
+        warmLocation(setAsOrigin = false)
     }
 
     fun setAlarm(mode: AlarmMode) {
@@ -222,30 +231,98 @@ class AppSession(
         if (to == Screen.Home) {
             refreshNearbyReports()
             refreshPackMapData()
+            warmLocation(setAsOrigin = false)
+        }
+        if (to == Screen.Search) {
+            warmLocation(setAsOrigin = origin == null)
         }
         if (to == Screen.Ranking) loadRanking()
         if (to == Screen.Lines) refreshPackMapData()
     }
 
-    fun useCurrentLocationAsOrigin() {
+    /** Pide permiso + fix fresco (Fused). Opcionalmente rellena origen. */
+    fun warmLocation(setAsOrigin: Boolean = false) {
         locationMessage = null
         platformRequestLocationPermission { granted ->
             if (!granted) {
                 locationMessage = strings.permissionLocationRationale
                 return@platformRequestLocationPermission
             }
-            val fix = platformLastLocation()
-            if (fix == null) {
-                locationMessage = strings.errorGeneric
-            } else {
-                val point = GeoPoint(fix.latitude, fix.longitude)
-                lastKnownLocation = point
-                origin = point
-                originLabel = strings.myLocation
-                originQuery = strings.myLocation
-                locationMessage = null
+            if (!platformIsLocationEnabled()) {
+                locationMessage = strings.locationDisabled
+                // Igual intenta lastKnown por si el sistema aún entrega algo
+            }
+            locating = true
+            locationMessage = strings.locating
+            platformFetchCurrentLocation { fix ->
+                locating = false
+                if (fix == null) {
+                    val cached = platformLastLocation()
+                    if (cached != null) {
+                        applyLocationFix(cached, setAsOrigin)
+                    } else {
+                        locationMessage = strings.locationUnavailable
+                    }
+                } else {
+                    applyLocationFix(fix, setAsOrigin)
+                }
             }
         }
+    }
+
+    fun useCurrentLocationAsOrigin() {
+        warmLocation(setAsOrigin = true)
+        locationFollowEpoch += 1
+    }
+
+    /** Recentrar mapa en el usuario (FAB). */
+    fun recenterOnUser() {
+        warmLocation(setAsOrigin = origin == null)
+        locationFollowEpoch += 1
+    }
+
+    fun startUserLocationWatch(setOriginIfEmpty: Boolean = false) {
+        stopUserLocationWatch()
+        val fillOrigin = setOriginIfEmpty && origin == null
+        platformRequestLocationPermission { granted ->
+            if (!granted) {
+                locationMessage = strings.permissionLocationRationale
+                return@platformRequestLocationPermission
+            }
+            if (!platformIsLocationEnabled()) {
+                locationMessage = strings.locationDisabled
+            }
+            locating = true
+            locationMessage = strings.locating
+            platformFetchCurrentLocation { fix ->
+                locating = false
+                val resolved = fix ?: platformLastLocation()
+                if (resolved == null) {
+                    locationMessage = strings.locationUnavailable
+                } else {
+                    applyLocationFix(resolved, fillOrigin)
+                }
+            }
+            stopUserLocationWatchHandle = platformWatchUserLocation { loc ->
+                lastKnownLocation = GeoPoint(loc.latitude, loc.longitude)
+            }
+        }
+    }
+
+    fun stopUserLocationWatch() {
+        stopUserLocationWatchHandle?.invoke()
+        stopUserLocationWatchHandle = null
+    }
+
+    private fun applyLocationFix(fix: PlatformLocation, setAsOrigin: Boolean) {
+        val point = GeoPoint(fix.latitude, fix.longitude)
+        lastKnownLocation = point
+        if (setAsOrigin) {
+            origin = point
+            originLabel = strings.myLocation
+            originQuery = strings.myLocation
+        }
+        locationMessage = null
     }
 
     fun applyRecent(trip: RecentTrip) {
@@ -393,13 +470,18 @@ class AppSession(
                 onNeedPermission?.invoke()
                 return@platformRequestLocationPermission
             }
-            val fix = platformLastLocation()
-            if (fix == null) {
-                reportMessage = strings.errorGeneric
-            } else {
-                reportLat = fix.latitude
-                reportLng = fix.longitude
-                reportMessage = null
+            if (!platformIsLocationEnabled()) {
+                reportMessage = strings.locationDisabled
+            }
+            platformFetchCurrentLocation { fix ->
+                val resolved = fix ?: platformLastLocation()
+                if (resolved == null) {
+                    reportMessage = strings.locationUnavailable
+                } else {
+                    reportLat = resolved.latitude
+                    reportLng = resolved.longitude
+                    reportMessage = null
+                }
             }
         }
     }

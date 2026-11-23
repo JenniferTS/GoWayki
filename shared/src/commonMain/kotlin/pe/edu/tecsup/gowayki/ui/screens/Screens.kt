@@ -38,6 +38,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -106,6 +107,12 @@ fun SplashScreen(session: AppSession) {
 @Composable
 fun HomeScreen(session: AppSession) {
     val s = session.strings
+    LaunchedEffect(Unit) {
+        session.startUserLocationWatch(setOriginIfEmpty = false)
+    }
+    DisposableEffect(Unit) {
+        onDispose { session.stopUserLocationWatch() }
+    }
     Scaffold(
         backgroundColor = Color.Transparent,
         bottomBar = {
@@ -132,8 +139,11 @@ fun HomeScreen(session: AppSession) {
                                 },
                                 stops = session.mapStopPoints,
                                 route = session.selectedLineGeometry,
-                                camera = pe.edu.tecsup.gowayki.domain.planner.GeoPoint(-16.399, -71.537),
-                                zoom = 12.2,
+                                user = session.lastKnownLocation,
+                                camera = session.lastKnownLocation
+                                    ?: pe.edu.tecsup.gowayki.domain.planner.GeoPoint(-16.399, -71.537),
+                                zoom = if (session.lastKnownLocation != null) 14.2 else 12.2,
+                                followEpoch = session.locationFollowEpoch,
                             ),
                         )
                         Box(
@@ -290,8 +300,17 @@ fun SearchScreen(session: AppSession) {
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                SoftButton(s.myLocation, onClick = { session.useCurrentLocationAsOrigin() })
-                session.locationMessage?.let { Text(it, color = MaterialTheme.colors.error, fontSize = 13.sp) }
+                SoftButton(
+                    if (session.locating) s.locating else s.myLocation,
+                    onClick = { session.useCurrentLocationAsOrigin() },
+                )
+                session.locationMessage?.let {
+                    Text(
+                        it,
+                        color = if (session.locating) GowaykiColors.Stone else MaterialTheme.colors.error,
+                        fontSize = 13.sp,
+                    )
+                }
                 SoftButton("Plaza de Armas → TECSUP", onClick = { session.useDemoEndpoints() })
                 if (session.favorites.isNotEmpty()) {
                     Text(s.favorites, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))

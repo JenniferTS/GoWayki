@@ -30,11 +30,16 @@ expect fun platformRemoteReports(): RemoteReportsClient?
 expect fun platformUserStateSync(): UserStateSync
 expect fun platformRanking(): RankingClient?
 expect fun platformLastLocation(): PlatformLocation?
+/** Lectura fresca (Fused getCurrentLocation); async. */
+expect fun platformFetchCurrentLocation(onResult: (PlatformLocation?) -> Unit)
 expect fun platformRequestLocationPermission(onResult: (Boolean) -> Unit)
+expect fun platformIsLocationEnabled(): Boolean
 expect fun platformTripAlert(title: String, body: String, mode: AlarmMode)
 expect fun platformClearTripNotifications()
 /** Starts location updates for an active trip; returns a cancel handle. */
 expect fun platformWatchTripLocation(onFix: (PositionFix) -> Unit): () -> Unit
+/** Watch liviano para UI (mapa / origen), sin foreground service. */
+expect fun platformWatchUserLocation(onFix: (PlatformLocation) -> Unit): () -> Unit
 /** Preferir foreground service en Android; cae a [platformWatchTripLocation] si no hay. */
 expect fun platformStartTripTracking(onFix: (PositionFix) -> Unit): () -> Unit
 expect fun platformStopTripTracking()

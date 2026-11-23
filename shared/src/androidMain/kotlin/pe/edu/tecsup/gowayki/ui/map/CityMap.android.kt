@@ -334,26 +334,40 @@ private fun applyOverlay(
     }
 
     val fitKey = routeFingerprint(fallbackRoute, segments) + "|" +
-        (overlay.camera?.let { "${it.latitude},${it.longitude}" } ?: "") + "|${overlay.zoom}"
+        (overlay.camera?.let { "${it.latitude},${it.longitude}" } ?: "") +
+        "|${overlay.zoom}|fu=${overlay.followEpoch}"
     if (forceFit || fitKey != previousFitKey) {
-        if (path.size >= 2) {
-            val builder = LatLngBounds.Builder()
-            path.forEach { builder.include(LatLng(it.latitude, it.longitude)) }
-            overlay.user?.let { builder.include(LatLng(it.latitude, it.longitude)) }
-            runCatching {
-                map.easeCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 72), 480)
-            }.onFailure {
-                val mid = path[path.size / 2]
-                map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(mid.latitude, mid.longitude), overlay.zoom))
+        val followUser = overlay.followEpoch > 0L && overlay.user != null &&
+            !previousFitKey.endsWith("|fu=${overlay.followEpoch}")
+        when {
+            followUser -> {
+                val u = overlay.user!!
+                map.easeCamera(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(u.latitude, u.longitude), 15.6),
+                    420,
+                )
             }
-        } else {
-            val focus = overlay.camera
-                ?: overlay.user
-                ?: overlay.markers.firstOrNull()
-                ?: GeoPoint(-16.399, -71.537)
-            map.moveCamera(
-                CameraUpdateFactory.newLatLngZoom(LatLng(focus.latitude, focus.longitude), overlay.zoom),
-            )
+            path.size >= 2 -> {
+                val builder = LatLngBounds.Builder()
+                path.forEach { builder.include(LatLng(it.latitude, it.longitude)) }
+                overlay.user?.let { builder.include(LatLng(it.latitude, it.longitude)) }
+                runCatching {
+                    map.easeCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 72), 480)
+                }.onFailure {
+                    val mid = path[path.size / 2]
+                    map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(mid.latitude, mid.longitude), overlay.zoom))
+                }
+            }
+            else -> {
+                val focus = overlay.user
+                    ?: overlay.camera
+                    ?: overlay.markers.firstOrNull()
+                    ?: GeoPoint(-16.399, -71.537)
+                map.easeCamera(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(focus.latitude, focus.longitude), overlay.zoom),
+                    380,
+                )
+            }
         }
     }
     return fitKey
