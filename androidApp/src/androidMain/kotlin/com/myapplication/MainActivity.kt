@@ -6,10 +6,13 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.os.HandlerCompat
+import android.os.Looper
 import installGowaykiRuntime
 import pe.edu.tecsup.gowayki.data.auth.AndroidFirebaseAuthRepository
 import pe.edu.tecsup.gowayki.data.citypack.openArequipaCityPack
 import pe.edu.tecsup.gowayki.data.prefs.AndroidPreferencesRepository
+import pe.edu.tecsup.gowayki.domain.auth.SignedInUser
 import pe.edu.tecsup.gowayki.domain.models.PlaceResult
 import pe.edu.tecsup.gowayki.domain.planner.PlannerNetwork
 import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
@@ -24,14 +27,19 @@ class MainActivity : AppCompatActivity() {
     private val packRef = AtomicReference<CityPackRepository?>(null)
     private val networkRef = AtomicReference<PlannerNetwork?>(null)
     private lateinit var authRepo: AndroidFirebaseAuthRepository
+    private val mainHandler = HandlerCompat.createAsync(Looper.getMainLooper())
 
     private val googleLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
+        if (result.resultCode != RESULT_OK) {
+            postAuthError("Inicio de sesión cancelado.")
+            return@registerForActivityResult
+        }
         authRepo.completeGoogleSignInAsync(
             data = result.data,
-            onSuccess = { user -> GoogleSignInBridge.onSuccess?.invoke(user) },
-            onError = { msg -> GoogleSignInBridge.onError?.invoke(msg) },
+            onSuccess = { user -> postAuthSuccess(user) },
+            onError = { msg -> postAuthError(msg) },
         )
     }
 
@@ -44,13 +52,18 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID,
         )
-        GoogleSignInBridge.launch = { googleLauncher.launch(authRepo.beginGoogleSignIn()) }
+        GoogleSignInBridge.launch = {
+            authRepo.prepareGoogleSignIn { intent ->
+                googleLauncher.launch(intent)
+            }
+        }
         GoogleSignInBridge.authRepository = authRepo
 
         val placeSearch = PlaceSearchRepository {
             packRef.get()?.searchPlaces(it)?.map { place -> place.toPlaceResult() } ?: emptyList()
         }
         val preferences: PreferencesRepository = AndroidPreferencesRepository(this)
+        val restored = authRepo.currentUser()?.takeIf { !it.isAnonymous }
 
         installGowaykiRuntime(
             GowaykiRuntime(
@@ -59,6 +72,7 @@ class MainActivity : AppCompatActivity() {
                 networkProvider = { networkRef.get() },
                 cityPackProvider = { packRef.get() },
                 preferences = preferences,
+                initialSignedIn = restored,
             ),
         )
 
@@ -72,6 +86,18 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             MainView()
+        }
+    }
+
+    private fun postAuthSuccess(user: SignedInUser) {
+        mainHandler.post {
+            GoogleSignInBridge.onSuccess?.invoke(user)
+        }
+    }
+
+    private fun postAuthError(msg: String) {
+        mainHandler.post {
+            GoogleSignInBridge.onError?.invoke(msg)
         }
     }
 }
