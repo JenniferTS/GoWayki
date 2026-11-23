@@ -27,7 +27,7 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
 ## Versión
 
-APK debug **1.5.5** (`versionCode` 15) — logo fondo blanco. Anterior: 1.5.4 crash fix (`versionCode` 14).
+APK debug **1.5.6** (`versionCode` 16) — logo fondo blanco. Anterior: 1.5.4 crash fix (`versionCode` 14).
 
 ```bash
 export ANDROID_HOME=/home/agentes/android-sdk

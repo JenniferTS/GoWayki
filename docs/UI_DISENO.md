@@ -1,22 +1,23 @@
-# gowayki go UI — identidad visual (v1.4)
+# gowayki go UI — identidad + motion (v1.5.6)
 
-## Marca (manual + hoja Drive)
+## Marca
 - Nombre: **gowayki go** (go naranja + wayki tinta)
-- Primarios: naranja `#F05709`, tinta `#292929`
-- Acentos: `#F98E00`, `#E84513`, `#BC5433`
-- Tipografías (manual, embebidas): **Righteous** (display/wordmark) · **Ubuntu** (UI/cuerpo) · **Poppins** (énfasis/botones/caption)
-- Logo isotipo: zorro-G con nodos de red (launcher + BrandLogo)
-- Iconos UI: set lúdico stroke redondeado (estilo Phosphor/Bootstrap)
+- Primarios: `#F05709` / `#292929` · tipografías Righteous · Ubuntu · Poppins
+- Logo: zorro-G con fondo blanco (drawable + launcher)
 
-## Motion (respeta “movimiento reducido”)
-1. Entrada de pantalla: fade + slide (~280 ms)
-2. CTA primario: scale press bounce + shimmer
-3. Bottom nav: scale bounce del ítem activo
-4. Splash / BrandMark: logo scale-in snappy
-5. MapsJourney: sheet slide-up, chips/pasos stagger, FAB pulse al localizar
-6. StaggerIn reutilizable para listas
+## Referencias (ver `REFERENCIAS_TURUTA_LUMA.md`)
+- **TuRuta**: claridad funcional (buscar → comparar → pasos). Sin copiar marca; sin GPS de buses.
+- **Luma**: jerarquía, paneles, tipografía e interacciones cuidadas.
 
-## Pantallas clave
-- **Home**: mapa a sangre (hero), marca grande, un CTA de búsqueda, fila de atajos, reportes como chips
-- **Onboarding**: ilustración animada a página completa, tipografía hero
-- **Search / Detail**: superficies elevadas, botones pill terracota
+## Motion (Compose, calidad tipo Flutter)
+1. Pantallas: fade + slide corto; respeta movimiento reducido.
+2. CTA: press scale spring (sin shimmer infinito).
+3. Búsqueda: panel `animateContentSize` + `imePadding`; foco con borde.
+4. Resultados: stagger **una vez** por plan (`StaggerIn` + `enterKey`).
+5. Selección de ruta: color/escala animados; mapa `easeCamera` con padding de hoja.
+6. `JourneySheet`: snapeos peek / mid / full + drag con spring `panel()`.
+7. Reportes: `ActionConfirmBanner` + háptica `Success`.
+8. Háptica discreta (`platformHaptic`) en Android.
+
+## Recorrido entregable
+Inicio → Search → planificar → MapsJourney (comparar / pasos / Atrás conserva O-D y selección).

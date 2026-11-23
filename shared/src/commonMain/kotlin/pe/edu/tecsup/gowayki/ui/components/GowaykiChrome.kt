@@ -129,17 +129,22 @@ fun EnterContent(
     ) { content() }
 }
 
-/** Entrada escalonada (cards, chips, pasos). */
+/**
+ * Entrada escalonada. [enterKey] fija el plan/lista: al cambiar selección
+ * no se reanima; solo al llegar un nuevo conjunto de resultados.
+ */
 @Composable
 fun StaggerIn(
     index: Int,
     modifier: Modifier = Modifier,
+    enterKey: Any? = Unit,
     content: @Composable () -> Unit,
 ) {
     val reduce = LocalMotionPrefs.current.reduceMotion
-    var visible by remember { mutableStateOf(reduce) }
-    LaunchedEffect(index) {
-        if (!reduce) delay((index * GowaykiMotion.StaggerMs).toLong().coerceAtMost(360))
+    var visible by remember(enterKey) { mutableStateOf(reduce) }
+    LaunchedEffect(enterKey, index) {
+        if (visible) return@LaunchedEffect
+        if (!reduce) delay((index * GowaykiMotion.StaggerMs).toLong().coerceAtMost(280))
         visible = true
     }
     AnimatedVisibility(
@@ -148,7 +153,7 @@ fun StaggerIn(
         enter = fadeIn(if (reduce) GowaykiMotion.none() else GowaykiMotion.soft()) +
             slideInHorizontally(
                 animationSpec = if (reduce) GowaykiMotion.none() else GowaykiMotion.soft(),
-                initialOffsetX = { if (reduce) 0 else 28 },
+                initialOffsetX = { if (reduce) 0 else 20 },
             ),
         exit = fadeOut(GowaykiMotion.micro()),
     ) { content() }
@@ -278,17 +283,6 @@ fun PrimaryButton(
     val reduce = LocalMotionPrefs.current.reduceMotion
     val scale = PressScale(reduce, pressed && enabled)
     val shape = RoundedCornerShape(GowaykiRadius.pill)
-    val shimmer = remember { Animatable(0f) }
-    LaunchedEffect(enabled, reduce) {
-        if (!enabled || reduce) {
-            shimmer.snapTo(0f)
-            return@LaunchedEffect
-        }
-        while (true) {
-            shimmer.animateTo(1f, tween(1800))
-            shimmer.snapTo(0f)
-        }
-    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -316,21 +310,11 @@ fun PrimaryButton(
             )
             .then(
                 if (enabled) {
-                    Modifier
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.22f * (1f - shimmer.value)),
-                                    Color.Transparent,
-                                    Color.White.copy(alpha = 0.12f * shimmer.value),
-                                ),
-                            ),
-                        )
-                        .clickable(
-                            interactionSource = interaction,
-                            indication = null,
-                            onClick = onClick,
-                        )
+                    Modifier.clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = onClick,
+                    )
                 } else {
                     Modifier
                 },
@@ -476,6 +460,39 @@ fun BottomNavBar(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Confirmación breve vinculada a una acción (p. ej. reporte enviado). */
+@Composable
+fun ActionConfirmBanner(
+    visible: Boolean,
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    val reduce = LocalMotionPrefs.current.reduceMotion
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(if (reduce) GowaykiMotion.none() else GowaykiMotion.soft()) +
+            slideInVertically(
+                animationSpec = if (reduce) GowaykiMotion.none() else GowaykiMotion.panel(),
+                initialOffsetY = { if (reduce) 0 else 24 },
+            ),
+        exit = fadeOut(GowaykiMotion.micro()),
+    ) {
+        Surface(
+            color = GowaykiColors.Success,
+            shape = RoundedCornerShape(GowaykiRadius.md),
+            elevation = 8.dp,
+        ) {
+            Text(
+                message,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            )
         }
     }
 }

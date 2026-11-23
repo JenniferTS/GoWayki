@@ -75,7 +75,14 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                             map.setStyle(Style.Builder().fromUri(styleFile!!.toURI().toString())) { style ->
                                 runCatching {
                                     ensureSources(style)
-                                    fitHolder.key = applyOverlay(style, map, overlay, fitHolder.key, forceFit = true)
+                                    fitHolder.key = applyOverlay(
+                                        style,
+                                        map,
+                                        overlay,
+                                        fitHolder.key,
+                                        forceFit = true,
+                                        density = view.resources.displayMetrics.density,
+                                    )
                                 }
                             }
                         }
@@ -86,7 +93,14 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                         map.getStyle { style ->
                             runCatching {
                                 ensureSources(style)
-                                fitHolder.key = applyOverlay(style, map, overlay, fitHolder.key, forceFit = false)
+                                fitHolder.key = applyOverlay(
+                                    style,
+                                    map,
+                                    overlay,
+                                    fitHolder.key,
+                                    forceFit = false,
+                                    density = view.resources.displayMetrics.density,
+                                )
                             }.onFailure {
                                 // No tumbar la Activity si el estilo aún no está listo o la cota es inválida.
                             }
@@ -264,6 +278,7 @@ private fun applyOverlay(
     overlay: MapOverlay,
     previousFitKey: String,
     forceFit: Boolean,
+    density: Float,
 ): String {
     val segments = overlay.segments
     val fallbackRoute = dedupeNearby(overlay.route)
@@ -341,10 +356,14 @@ private fun applyOverlay(
 
     val fitKey = routeFingerprint(fallbackRoute, segments) + "|" +
         (overlay.camera?.let { "${it.latitude},${it.longitude}" } ?: "") +
-        "|${overlay.zoom}|fu=${overlay.followEpoch}"
+        "|${overlay.zoom}|fu=${overlay.followEpoch}|pb=${overlay.fitPaddingBottomDp}"
     if (forceFit || fitKey != previousFitKey) {
+        val bottomPad = ((overlay.fitPaddingBottomDp.takeIf { it > 0 } ?: 72) * density).toInt()
+        val side = (48 * density).toInt()
+        val top = (96 * density).toInt()
+        val prevFollow = Regex("""\|fu=(\d+)""").find(previousFitKey)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
         val followUser = overlay.followEpoch > 0L && overlay.user != null &&
-            !previousFitKey.endsWith("|fu=${overlay.followEpoch}")
+            overlay.followEpoch != prevFollow
         when {
             followUser -> {
                 val u = overlay.user!!
@@ -358,7 +377,16 @@ private fun applyOverlay(
                 path.forEach { builder.include(LatLng(it.latitude, it.longitude)) }
                 overlay.user?.let { builder.include(LatLng(it.latitude, it.longitude)) }
                 runCatching {
-                    map.easeCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 72), 480)
+                    map.easeCamera(
+                        CameraUpdateFactory.newLatLngBounds(
+                            builder.build(),
+                            side,
+                            top,
+                            side,
+                            bottomPad,
+                        ),
+                        480,
+                    )
                 }.onFailure {
                     val mid = path[path.size / 2]
                     map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(mid.latitude, mid.longitude), overlay.zoom))

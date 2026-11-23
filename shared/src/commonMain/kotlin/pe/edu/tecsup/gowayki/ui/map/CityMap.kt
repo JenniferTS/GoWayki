@@ -29,6 +29,8 @@ data class MapOverlay(
     val zoom: Double = 13.0,
     /** Si >0 y hay [user], la cámara se centra en el usuario (FAB mi ubicación). */
     val followEpoch: Long = 0L,
+    /** Padding inferior al encuadrar el recorrido (p. ej. altura de la hoja), en dp. */
+    val fitPaddingBottomDp: Int = 0,
 ) {
     val effectiveRoute: List<GeoPoint>
         get() = when {
