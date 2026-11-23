@@ -3,6 +3,7 @@ import androidx.compose.runtime.remember
 import pe.edu.tecsup.gowayki.domain.planner.PlannerNetwork
 import pe.edu.tecsup.gowayki.domain.preferences.InMemoryPreferencesRepository
 import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
+import pe.edu.tecsup.gowayki.domain.repositories.CityPackRepository
 import pe.edu.tecsup.gowayki.domain.repositories.PlaceSearchRepository
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
@@ -12,6 +13,7 @@ import pe.edu.tecsup.gowayki.ui.screens.DetailScreen
 import pe.edu.tecsup.gowayki.ui.screens.GameScreen
 import pe.edu.tecsup.gowayki.ui.screens.HelpScreen
 import pe.edu.tecsup.gowayki.ui.screens.HomeScreen
+import pe.edu.tecsup.gowayki.ui.screens.LinesScreen
 import pe.edu.tecsup.gowayki.ui.screens.OnboardingScreen
 import pe.edu.tecsup.gowayki.ui.screens.ProfileScreen
 import pe.edu.tecsup.gowayki.ui.screens.RankingScreen
@@ -26,6 +28,7 @@ data class GowaykiRuntime(
     val deviceLanguage: String? = "es",
     val placeSearch: PlaceSearchRepository? = null,
     val networkProvider: (() -> PlannerNetwork?)? = null,
+    val cityPackProvider: (() -> CityPackRepository?)? = null,
     val preferences: PreferencesRepository = InMemoryPreferencesRepository(),
 )
 
@@ -42,6 +45,7 @@ fun App() {
             preferences = runtimeHolder.preferences,
             placeSearch = runtimeHolder.placeSearch,
             networkProvider = runtimeHolder.networkProvider,
+            cityPackProvider = runtimeHolder.cityPackProvider,
             deviceLanguage = runtimeHolder.deviceLanguage,
         )
     }
@@ -61,6 +65,7 @@ fun App() {
             Screen.Help -> HelpScreen(session)
             Screen.Auth -> AuthScreen(session)
             Screen.ActiveTrip -> ActiveTripScreen(session)
+            Screen.Lines -> LinesScreen(session)
         }
     }
 }

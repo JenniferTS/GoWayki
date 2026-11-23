@@ -19,6 +19,8 @@ interface RemoteReportsClient {
         radiusKm: Double = 8.0,
     ): ReportFeed
     fun mine(uid: String): List<CommunityReport>
+    /** Confirma un reporte ajeno. false si ya habías votado. */
+    fun confirm(reportId: String, uid: String): Boolean
 }
 
 class NoRemoteReportsClient : RemoteReportsClient {
@@ -35,4 +37,5 @@ class NoRemoteReportsClient : RemoteReportsClient {
         radiusKm: Double,
     ): ReportFeed = ReportFeed(emptyList(), fromCache = true)
     override fun mine(uid: String): List<CommunityReport> = emptyList()
+    override fun confirm(reportId: String, uid: String): Boolean = false
 }

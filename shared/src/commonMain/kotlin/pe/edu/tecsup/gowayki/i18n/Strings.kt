@@ -92,6 +92,16 @@ data class Strings(
     val alarmOff: String,
     val remainingMeters: String,
     val stopsRemaining: String,
+    val myLocation: String,
+    val linesExplorer: String,
+    val favorites: String,
+    val recentTrips: String,
+    val addFavorite: String,
+    val confirmReport: String,
+    val alreadyConfirmed: String,
+    val scoreSavedOffline: String,
+    val retryScores: String,
+    val pendingScores: String,
 )
 
 object StringCatalog {
@@ -185,6 +195,16 @@ object StringCatalog {
         alarmOff = "Apagada",
         remainingMeters = "Restan",
         stopsRemaining = "Paraderos",
+        myLocation = "Mi ubicación",
+        linesExplorer = "Líneas",
+        favorites = "Favoritos",
+        recentTrips = "Recientes",
+        addFavorite = "Guardar destino",
+        confirmReport = "Confirmar",
+        alreadyConfirmed = "Ya confirmaste este reporte.",
+        scoreSavedOffline = "Puntaje guardado offline; se publicará al conectar.",
+        retryScores = "Reintentar puntajes",
+        pendingScores = "Puntajes pendientes",
     )
 
     private val en = Strings(
@@ -277,6 +297,16 @@ object StringCatalog {
         alarmOff = "Off",
         remainingMeters = "Remaining",
         stopsRemaining = "Stops left",
+        myLocation = "My location",
+        linesExplorer = "Lines",
+        favorites = "Favorites",
+        recentTrips = "Recent",
+        addFavorite = "Save destination",
+        confirmReport = "Confirm",
+        alreadyConfirmed = "You already confirmed this report.",
+        scoreSavedOffline = "Score saved offline; it will publish when online.",
+        retryScores = "Retry scores",
+        pendingScores = "Pending scores",
     )
 
     fun forLocale(locale: AppLocale): Strings = when (locale) {

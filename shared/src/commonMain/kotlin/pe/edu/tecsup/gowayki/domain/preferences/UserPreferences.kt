@@ -113,6 +113,41 @@ object TutorialMigrationPolicy {
         if (newGoogleRegistration) forNewGoogleRegistration() else forExistingAccount(stored)
 }
 
+/** Línea persistida: name|lat|lng */
+data class SavedPlace(val name: String, val latitude: Double, val longitude: Double) {
+    fun encode(): String = "$name|$latitude|$longitude"
+
+    companion object {
+        fun decode(raw: String): SavedPlace? {
+            val p = raw.split('|')
+            if (p.size < 3) return null
+            val lat = p[p.size - 2].toDoubleOrNull() ?: return null
+            val lng = p[p.size - 1].toDoubleOrNull() ?: return null
+            val name = p.dropLast(2).joinToString("|")
+            if (name.isBlank()) return null
+            return SavedPlace(name, lat, lng)
+        }
+    }
+}
+
+/** Viaje reciente: fromName|fromLat|fromLng|toName|toLat|toLng */
+data class RecentTrip(
+    val from: SavedPlace,
+    val to: SavedPlace,
+) {
+    fun encode(): String = "${from.encode()}||${to.encode()}"
+
+    companion object {
+        fun decode(raw: String): RecentTrip? {
+            val parts = raw.split("||")
+            if (parts.size != 2) return null
+            val from = SavedPlace.decode(parts[0]) ?: return null
+            val to = SavedPlace.decode(parts[1]) ?: return null
+            return RecentTrip(from, to)
+        }
+    }
+}
+
 interface PreferencesRepository {
     fun readCityCode(): String?
     fun saveCityCode(code: String)
@@ -124,6 +159,15 @@ interface PreferencesRepository {
     /** Null si la cuenta vieja no tiene el campo tutorial. */
     fun readTutorial(): TutorialProgress?
     fun saveTutorial(progress: TutorialProgress)
+    fun readAlarmMode(): String?
+    fun saveAlarmMode(mode: String)
+    fun readFavorites(): List<SavedPlace>
+    fun saveFavorites(places: List<SavedPlace>)
+    fun readRecents(): List<RecentTrip>
+    fun saveRecents(trips: List<RecentTrip>)
+    /** Líneas `week|score|durationMs`. */
+    fun readPendingScores(): List<String>
+    fun savePendingScores(lines: List<String>)
     fun locale(deviceLanguage: String?): AppLocale = AppLocale.resolve(readLocaleCode(), deviceLanguage)
 }
 
@@ -133,6 +177,10 @@ class InMemoryPreferencesRepository : PreferencesRepository {
     private var onboarding: OnboardingStatus? = null
     private var tutorial: TutorialProgress? = null
     private var tutorialFieldPresent: Boolean = false
+    private var alarmMode: String? = null
+    private var favorites: List<SavedPlace> = emptyList()
+    private var recents: List<RecentTrip> = emptyList()
+    private var pendingScores: List<String> = emptyList()
 
     override fun readCityCode(): String? = cityCode
 
@@ -159,6 +207,26 @@ class InMemoryPreferencesRepository : PreferencesRepository {
     override fun saveTutorial(progress: TutorialProgress) {
         tutorial = progress
         tutorialFieldPresent = true
+    }
+
+    override fun readAlarmMode(): String? = alarmMode
+    override fun saveAlarmMode(mode: String) {
+        alarmMode = mode
+    }
+
+    override fun readFavorites(): List<SavedPlace> = favorites
+    override fun saveFavorites(places: List<SavedPlace>) {
+        favorites = places.take(20)
+    }
+
+    override fun readRecents(): List<RecentTrip> = recents
+    override fun saveRecents(trips: List<RecentTrip>) {
+        recents = trips.take(10)
+    }
+
+    override fun readPendingScores(): List<String> = pendingScores
+    override fun savePendingScores(lines: List<String>) {
+        pendingScores = lines
     }
 }
 

@@ -15,7 +15,7 @@ import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
 @Composable
 actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
     Canvas(modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(GowaykiColors.Sand)) {
-        val pts = overlay.route + overlay.markers + listOfNotNull(overlay.user, overlay.camera)
+        val pts = overlay.route + overlay.markers + overlay.stops + listOfNotNull(overlay.user, overlay.camera)
         if (pts.isEmpty()) return@Canvas
         val minLat = pts.minOf { it.latitude }
         val maxLat = pts.maxOf { it.latitude }

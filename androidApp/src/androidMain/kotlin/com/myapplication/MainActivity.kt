@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity() {
                 deviceLanguage = resources.configuration.locales[0]?.language ?: "es",
                 placeSearch = placeSearch,
                 networkProvider = { networkRef.get() },
+                cityPackProvider = { packRef.get() },
                 preferences = preferences,
             ),
         )

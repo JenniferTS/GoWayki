@@ -12,3 +12,5 @@ actual fun platformRequestLocationPermission(onResult: (Boolean) -> Unit) = onRe
 actual fun platformTripAlert(title: String, body: String, mode: AlarmMode) = Unit
 actual fun platformClearTripNotifications() = Unit
 actual fun platformWatchTripLocation(onFix: (PositionFix) -> Unit): () -> Unit = { }
+actual fun platformStartTripTracking(onFix: (PositionFix) -> Unit): () -> Unit = { }
+actual fun platformStopTripTracking() = Unit
