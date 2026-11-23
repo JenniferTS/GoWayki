@@ -1,14 +1,9 @@
 package pe.edu.tecsup.gowayki.ui.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -24,21 +19,14 @@ actual fun BrandLogo(
     modifier: Modifier,
     size: Dp,
 ) {
-    Box(
+    // PNG del adjunto ya viene con fondo blanco; se recorta en círculo.
+    Image(
+        painter = painterResource(R.drawable.logo_gowayki_go),
+        contentDescription = "gowayki go",
         modifier = modifier
             .size(size)
             .shadow(if (size >= 56.dp) 10.dp else 4.dp, CircleShape, spotColor = Color(0x33000000))
-            .clip(CircleShape)
-            .background(Color.White),
-        contentAlignment = Alignment.Center,
-    ) {
-        Image(
-            painter = painterResource(R.drawable.logo_gowayki_go),
-            contentDescription = "gowayki go",
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(size * 0.06f),
-            contentScale = ContentScale.Fit,
-        )
-    }
+            .clip(CircleShape),
+        contentScale = ContentScale.Crop,
+    )
 }
