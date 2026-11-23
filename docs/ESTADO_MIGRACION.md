@@ -27,7 +27,7 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
 ## Versión
 
-APK debug **1.5.2** (`versionCode` 12) — tipografías Righteous/Ubuntu/Poppins + motion. Anterior: 1.5.1 GPS Fused (`versionCode` 11).
+APK debug **1.5.3** (`versionCode` 13) — login Google (SHA debug) + logo adjunto. Anterior: 1.5.2 tipografías (`versionCode` 12).
 
 ```bash
 export ANDROID_HOME=/home/agentes/android-sdk

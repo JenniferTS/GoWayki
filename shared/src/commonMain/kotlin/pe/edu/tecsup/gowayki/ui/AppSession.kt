@@ -3,6 +3,7 @@ package pe.edu.tecsup.gowayki.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import pe.edu.tecsup.gowayki.domain.auth.SignedInUser
 import pe.edu.tecsup.gowayki.domain.community.CommunityReport
 import pe.edu.tecsup.gowayki.domain.community.InMemoryReportsRepository
 import pe.edu.tecsup.gowayki.domain.community.ReportDraft
@@ -106,6 +107,7 @@ class AppSession(
     private val cityPackProvider: (() -> CityPackRepository?)? = null,
     deviceLanguage: String? = "es",
     startAsGuest: Boolean = true,
+    private val initialSignedIn: SignedInUser? = null,
 ) {
     var locale by mutableStateOf(preferences.locale(deviceLanguage))
         private set
@@ -168,6 +170,8 @@ class AppSession(
     var locating by mutableStateOf(false)
     /** Sube al tocar “mi ubicación” para recentrar el mapa. */
     var locationFollowEpoch by mutableStateOf(0L)
+    var authBusy by mutableStateOf(false)
+    var authError by mutableStateOf<String?>(null)
 
     private var tracker: TripTracker? = null
     private var stopLocationWatch: (() -> Unit)? = null
@@ -180,9 +184,14 @@ class AppSession(
         packReady = networkProvider?.invoke() != null
         refreshPackMapData()
         pendingScoreCount = preferences.readPendingScores().size
-        val onboarding = preferences.readOnboarding()
-        screen = if (onboarding == null) Screen.Onboarding else Screen.Home
-        maybeStartTutorial()
+        val restored = initialSignedIn?.takeIf { !it.isAnonymous }
+        if (restored != null) {
+            applyGoogleUser(restored.uid, restored.displayName, isNew = false)
+        } else {
+            val onboarding = preferences.readOnboarding()
+            screen = if (onboarding == null) Screen.Onboarding else Screen.Home
+            maybeStartTutorial()
+        }
         refreshNearbyReports()
         flushPendingScores()
         warmLocation(setAsOrigin = false)
@@ -549,6 +558,8 @@ class AppSession(
     }
 
     fun applyGoogleUser(uid: String, displayName: String?, isNew: Boolean) {
+        authBusy = false
+        authError = null
         user = AuthUser(
             uid = uid,
             displayName = displayName,
@@ -569,10 +580,27 @@ class AppSession(
         if (remoteOnboarding != null && preferences.readOnboarding() == null) {
             preferences.saveOnboarding(remoteOnboarding)
         }
+        if (preferences.readOnboarding() == null && remoteOnboarding == null) {
+            preferences.saveOnboarding(OnboardingStatus.Completed)
+        }
         screen = Screen.Home
         maybeStartTutorial()
         flushPendingScores()
         loadRanking()
+    }
+
+    fun beginGoogleSignIn() {
+        authBusy = true
+        authError = null
+        pe.edu.tecsup.gowayki.platform.launchPlatformGoogleSignIn(
+            onSuccess = { signed ->
+                applyGoogleUser(signed.uid, signed.displayName, signed.isNewUser)
+            },
+            onError = { msg ->
+                authBusy = false
+                authError = msg
+            },
+        )
     }
 
     fun signInWithGoogleDemo(isNew: Boolean) {
@@ -586,6 +614,8 @@ class AppSession(
     fun signOutToGuest() {
         user = AuthUser(uid = "guest", displayName = null, isGuest = true)
         showTutorialOverlay = false
+        authError = null
+        authBusy = false
     }
 
     fun maybeStartTutorial() {

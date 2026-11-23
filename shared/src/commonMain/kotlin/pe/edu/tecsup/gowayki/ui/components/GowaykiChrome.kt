@@ -58,6 +58,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -171,13 +172,13 @@ fun BrandMark(
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (showLogo) {
             BrandLogo(
-                size = if (large) 58.dp else 40.dp,
+                size = if (large) 64.dp else 44.dp,
                 modifier = Modifier.graphicsLayer {
                     scaleX = logoScale.value
                     scaleY = logoScale.value
                 },
             )
-            Spacer(Modifier.size(10.dp))
+            Spacer(Modifier.size(12.dp))
         }
         Column {
             // Wordmark: Righteous (display del manual)
@@ -197,6 +198,48 @@ fun BrandMark(
                     color = if (light) Color.White.copy(alpha = 0.9f) else GowaykiColors.Stone,
                 )
             }
+        }
+    }
+}
+
+/** Logo centrado grande (login / splash) con wordmark debajo. */
+@Composable
+fun BrandHero(
+    subtitle: String? = null,
+    logoSize: Dp = 112.dp,
+) {
+    val reduce = LocalMotionPrefs.current.reduceMotion
+    val scale = remember { Animatable(if (reduce) 1f else 0.86f) }
+    LaunchedEffect(Unit) {
+        if (!reduce) scale.animateTo(1f, GowaykiMotion.snappy())
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        BrandLogo(
+            size = logoSize,
+            modifier = Modifier.graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            },
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = GowaykiColors.BrandOrange, fontFamily = GowaykiFonts.Display)) { append("go") }
+                withStyle(SpanStyle(color = GowaykiColors.BrandInk, fontFamily = GowaykiFonts.Display)) { append("wayki") }
+                append(" ")
+                withStyle(SpanStyle(color = GowaykiColors.BrandOrange, fontFamily = GowaykiFonts.Display)) { append("go") }
+            },
+            style = MaterialTheme.typography.h3,
+            textAlign = TextAlign.Center,
+        )
+        if (subtitle != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.body1,
+                color = GowaykiColors.Stone,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

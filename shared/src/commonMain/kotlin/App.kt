@@ -39,6 +39,7 @@ data class GowaykiRuntime(
     val networkProvider: (() -> PlannerNetwork?)? = null,
     val cityPackProvider: (() -> CityPackRepository?)? = null,
     val preferences: PreferencesRepository = InMemoryPreferencesRepository(),
+    val initialSignedIn: pe.edu.tecsup.gowayki.domain.auth.SignedInUser? = null,
 )
 
 private var runtimeHolder: GowaykiRuntime = GowaykiRuntime()
@@ -57,6 +58,8 @@ fun App() {
             networkProvider = runtimeHolder.networkProvider,
             cityPackProvider = runtimeHolder.cityPackProvider,
             deviceLanguage = runtimeHolder.deviceLanguage,
+            startAsGuest = runtimeHolder.initialSignedIn == null,
+            initialSignedIn = runtimeHolder.initialSignedIn,
         )
     }
     GowaykiTheme(reduceMotion = session.reduceMotion) {

@@ -1,12 +1,22 @@
 package pe.edu.tecsup.gowayki.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.myapplication.common.R
 
 @Composable
@@ -14,10 +24,21 @@ actual fun BrandLogo(
     modifier: Modifier,
     size: Dp,
 ) {
-    Image(
-        painter = painterResource(R.drawable.logo_gowayki_go),
-        contentDescription = "gowayki go",
-        modifier = modifier.size(size),
-        contentScale = ContentScale.Fit,
-    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .shadow(if (size >= 56.dp) 10.dp else 4.dp, CircleShape, spotColor = Color(0x33000000))
+            .clip(CircleShape)
+            .background(Color.White),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.logo_gowayki_go),
+            contentDescription = "gowayki go",
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(size * 0.06f),
+            contentScale = ContentScale.Fit,
+        )
+    }
 }

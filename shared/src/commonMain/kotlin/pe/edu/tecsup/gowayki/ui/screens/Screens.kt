@@ -68,6 +68,7 @@ import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
 import pe.edu.tecsup.gowayki.ui.components.AtmosphereBackground
 import pe.edu.tecsup.gowayki.ui.components.BottomNavBar
+import pe.edu.tecsup.gowayki.ui.components.BrandHero
 import pe.edu.tecsup.gowayki.ui.components.BrandMark
 import pe.edu.tecsup.gowayki.ui.components.EnterContent
 import pe.edu.tecsup.gowayki.ui.components.GlassPanel
@@ -95,7 +96,7 @@ fun SplashScreen(session: AppSession) {
     AtmosphereBackground {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(scale)) {
-                BrandMark(subtitle = "Arequipa · rutas con criterio", large = true)
+                BrandHero(subtitle = "Arequipa · rutas con criterio", logoSize = 128.dp)
                 Spacer(Modifier.height(28.dp))
                 CircularProgressIndicator(color = GowaykiColors.Terracotta, strokeWidth = 3.dp)
                 Text(session.strings.loading, color = GowaykiColors.Stone, modifier = Modifier.padding(top = 14.dp))
@@ -677,7 +678,6 @@ fun HelpScreen(session: AppSession) {
 @Composable
 fun AuthScreen(session: AppSession) {
     val s = session.strings
-    var authError by remember { mutableStateOf<String?>(null) }
     AtmosphereBackground {
         EnterContent(Modifier.padding(GowaykiSpace.lg).fillMaxSize()) {
             Column(
@@ -685,25 +685,29 @@ fun AuthScreen(session: AppSession) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                BrandMark(subtitle = s.signIn, large = true)
-                Spacer(Modifier.height(28.dp))
+                BrandHero(subtitle = s.signIn, logoSize = 120.dp)
+                Spacer(Modifier.height(32.dp))
                 PrimaryButton(
-                    text = s.signInGoogle,
-                    onClick = {
-                        authError = null
-                        pe.edu.tecsup.gowayki.platform.launchPlatformGoogleSignIn(
-                            onSuccess = { signed ->
-                                session.applyGoogleUser(signed.uid, signed.displayName, signed.isNewUser)
-                            },
-                            onError = { authError = it },
-                        )
-                    },
+                    text = if (session.authBusy) s.loading else s.signInGoogle,
+                    onClick = { session.beginGoogleSignIn() },
+                    enabled = !session.authBusy,
                 )
+                Spacer(Modifier.height(10.dp))
                 SoftButton(
                     text = "${s.signInGoogle} (demo)",
                     onClick = { session.signInWithGoogleDemo(isNew = true) },
                 )
-                authError?.let { Text(it, color = MaterialTheme.colors.error) }
+                session.authError?.let {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        it,
+                        color = MaterialTheme.colors.error,
+                        style = MaterialTheme.typography.body2,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
                 TextButton(onClick = { session.go(Screen.Home) }) { Text(s.skip) }
             }
         }
