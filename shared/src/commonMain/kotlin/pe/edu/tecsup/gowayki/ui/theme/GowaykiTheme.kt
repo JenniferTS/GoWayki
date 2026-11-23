@@ -17,26 +17,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Tokens de marca (zorro andino / transporte Arequipa). */
+/**
+ * Identidad visual GoWayki Go (manual + hoja de marca).
+ * Primarios: #F05709 / #292929 · acentos: #F98E00 / #E84513 / #BC5433
+ * Tipografías de marca: Righteous / Ubuntu / Poppins → Sans del sistema (peso lúdico).
+ */
 object GowaykiColors {
-    val Terracotta = Color(0xFFC45A32)
-    val TerracottaDark = Color(0xFF8E3D22)
-    val TerracottaSoft = Color(0xFFF0C2AE)
-    val Sand = Color(0xFFE8D5BC)
-    val Mist = Color(0xFFF6F1EA)
-    val Ivory = Color(0xFFFAF7F2)
-    val Charcoal = Color(0xFF1A1714)
-    val Stone = Color(0xFF6E675F)
-    val Surface = Color(0xFFFFFCF8)
+    /** Naranja corporativo principal. */
+    val BrandOrange = Color(0xFFF05709)
+    val BrandOrangeHot = Color(0xFFE84513)
+    val BrandAmber = Color(0xFFF98E00)
+    val BrandClay = Color(0xFFBC5433)
+    val BrandInk = Color(0xFF292929)
+
+    // Aliases usados en UI existente
+    val Terracotta = BrandOrange
+    val TerracottaDark = BrandOrangeHot
+    val TerracottaSoft = Color(0xFFFFC4A3)
+    val Sand = Color(0xFFFFE4D4)
+    val Mist = Color(0xFFFFF7F2)
+    val Ivory = Color(0xFFFFFCFA)
+    val Charcoal = BrandInk
+    val Stone = Color(0xFF6B6560)
+    val Surface = Color(0xFFFFFCFA)
     val SurfaceElevated = Color(0xFFFFFFFF)
-    val Outline = Color(0xFFDDD4CA)
-    val TransitOutbound = Color(0xFF1F6FE5)
-    val TransitInbound = Color(0xFFC93B6E)
+    val Outline = Color(0xFFE8D5CA)
+    val TransitOutbound = Color(0xFF1C61A5)
+    val TransitInbound = Color(0xFFE84513)
     val Success = Color(0xFF2F6F4E)
-    val Warning = Color(0xFFC47A1A)
-    val Amber = Color(0xFFE08A3A)
-    val Night = Color(0xFF12100E)
-    val Glow = Color(0x33C45A32)
+    val Warning = BrandAmber
+    val Amber = BrandAmber
+    val Night = Color(0xFF161616)
+    val Glow = Color(0x55F05709)
 }
 
 object GowaykiMotion {
@@ -71,15 +83,15 @@ val LocalMotionPrefs = staticCompositionLocalOf { MotionPrefs() }
 
 private val BrandTypography = Typography(
     h3 = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Black,
         fontSize = 34.sp,
         lineHeight = 40.sp,
-        letterSpacing = (-0.5).sp,
+        letterSpacing = (-0.4).sp,
         color = GowaykiColors.Charcoal,
     ),
     h4 = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
         lineHeight = 34.sp,
@@ -122,9 +134,9 @@ private val BrandTypography = Typography(
     ),
     button = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 15.sp,
-        letterSpacing = 0.2.sp,
+        letterSpacing = 0.3.sp,
     ),
     caption = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -136,9 +148,9 @@ private val BrandTypography = Typography(
 )
 
 private val Light = lightColors(
-    primary = GowaykiColors.Terracotta,
-    primaryVariant = GowaykiColors.TerracottaDark,
-    secondary = GowaykiColors.Sand,
+    primary = GowaykiColors.BrandOrange,
+    primaryVariant = GowaykiColors.BrandOrangeHot,
+    secondary = GowaykiColors.BrandAmber,
     background = GowaykiColors.Mist,
     surface = GowaykiColors.Surface,
     onPrimary = Color.White,
@@ -149,11 +161,11 @@ private val Light = lightColors(
 )
 
 private val Dark = darkColors(
-    primary = GowaykiColors.TerracottaSoft,
-    primaryVariant = GowaykiColors.Terracotta,
-    secondary = GowaykiColors.Terracotta,
+    primary = GowaykiColors.BrandAmber,
+    primaryVariant = GowaykiColors.BrandOrange,
+    secondary = GowaykiColors.BrandOrange,
     background = GowaykiColors.Night,
-    surface = Color(0xFF24201C),
+    surface = Color(0xFF242424),
     onPrimary = GowaykiColors.Charcoal,
     onSecondary = Color.White,
     onBackground = GowaykiColors.Ivory,

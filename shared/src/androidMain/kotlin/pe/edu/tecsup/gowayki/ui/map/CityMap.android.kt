@@ -131,7 +131,7 @@ private fun ensureSources(style: Style) {
         )
         style.addLayer(
             LineLayer(ROUTE_LAYER, ROUTE_SOURCE).withProperties(
-                PropertyFactory.lineColor(AndroidColor.parseColor("#C45A32")),
+                PropertyFactory.lineColor(AndroidColor.parseColor("#F05709")),
                 PropertyFactory.lineWidth(5.5f),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),

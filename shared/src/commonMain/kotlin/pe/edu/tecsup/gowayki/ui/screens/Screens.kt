@@ -70,6 +70,8 @@ import pe.edu.tecsup.gowayki.ui.components.BottomNavBar
 import pe.edu.tecsup.gowayki.ui.components.BrandMark
 import pe.edu.tecsup.gowayki.ui.components.EnterContent
 import pe.edu.tecsup.gowayki.ui.components.GlassPanel
+import pe.edu.tecsup.gowayki.ui.components.GowaykiIcons
+import pe.edu.tecsup.gowayki.ui.components.NavItem
 import pe.edu.tecsup.gowayki.ui.components.PrimaryButton
 import pe.edu.tecsup.gowayki.ui.components.ScreenHeader
 import pe.edu.tecsup.gowayki.ui.components.SoftButton
@@ -214,10 +216,10 @@ fun HomeScreen(session: AppSession) {
         bottomBar = {
             BottomNavBar(
                 items = listOf(
-                    s.homeSearchCta to { session.go(Screen.Search) },
-                    s.linesExplorer to { session.go(Screen.Lines) },
-                    s.homeReport to { session.go(Screen.Reports) },
-                    s.homeProfile to { session.go(Screen.Profile) },
+                    NavItem(s.homeRoutes, GowaykiIcons.Routes) { session.go(Screen.Home) },
+                    NavItem(s.homeSearchCta, GowaykiIcons.Search) { session.go(Screen.Search) },
+                    NavItem(s.homeReport, GowaykiIcons.Report) { session.go(Screen.Reports) },
+                    NavItem(s.homeProfile, GowaykiIcons.Profile) { session.go(Screen.Profile) },
                 ),
                 activeIndex = 0,
             )
@@ -249,7 +251,7 @@ fun HomeScreen(session: AppSession) {
                                 ),
                         )
                         Column(Modifier.align(Alignment.TopStart).padding(GowaykiSpace.lg)) {
-                            BrandMark(subtitle = "Arequipa en movimiento", large = true)
+                            BrandMark(subtitle = "Arequipa en movimiento", large = true, light = true)
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 "${s.fareEstimated}: ${session.formatFare(session.baseFare)}",
