@@ -75,14 +75,15 @@ fun AtmosphereBackground(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val reduce = LocalMotionPrefs.current.reduceMotion
-    val infinite = rememberInfiniteTransition()
+    val infinite = rememberInfiniteTransition(label = "atmosphere")
     val glowAnim by infinite.animateFloat(
         initialValue = 0.32f,
         targetValue = 0.58f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (reduce) 0 else 2400),
+            animation = tween(2400),
             repeatMode = RepeatMode.Reverse,
         ),
+        label = "atmosphereGlow",
     )
     val glow = if (reduce) 0.4f else glowAnim
     Box(

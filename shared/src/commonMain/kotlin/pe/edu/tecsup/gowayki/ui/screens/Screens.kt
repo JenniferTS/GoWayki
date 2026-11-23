@@ -90,7 +90,7 @@ fun SplashScreen(session: AppSession) {
     val reduce = LocalMotionPrefs.current.reduceMotion
     val scale by animateFloatAsState(
         targetValue = 1f,
-        animationSpec = tween(if (reduce) 0 else GowaykiMotion.EmphasizedMs),
+        animationSpec = tween(if (reduce) 1 else GowaykiMotion.EmphasizedMs),
     )
     LaunchedEffect(Unit) { session.bootstrap() }
     AtmosphereBackground {
