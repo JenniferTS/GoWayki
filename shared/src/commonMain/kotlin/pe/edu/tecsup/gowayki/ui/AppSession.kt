@@ -135,6 +135,8 @@ class AppSession(
     var planError by mutableStateOf<String?>(null)
     var journey by mutableStateOf<JourneyResponse?>(null)
     var selectedItinerary by mutableStateOf<Itinerary?>(null)
+    var selectedItineraryIndex by mutableStateOf(0)
+    var lastKnownLocation by mutableStateOf<GeoPoint?>(null)
     var reportKind by mutableStateOf(ReportKind.HeavyTraffic)
     var reportDescription by mutableStateOf("")
     var reportLat by mutableStateOf(-16.4090)
@@ -236,7 +238,9 @@ class AppSession(
             if (fix == null) {
                 locationMessage = strings.errorGeneric
             } else {
-                origin = GeoPoint(fix.latitude, fix.longitude)
+                val point = GeoPoint(fix.latitude, fix.longitude)
+                lastKnownLocation = point
+                origin = point
                 originLabel = strings.myLocation
                 originQuery = strings.myLocation
                 locationMessage = null
@@ -370,10 +374,15 @@ class AppSession(
     }
 
     fun openDetail(index: Int) {
+        selectItinerary(index)
+        screen = Screen.Detail(index)
+    }
+
+    fun selectItinerary(index: Int) {
         val list = journey?.itineraries.orEmpty()
         if (index in list.indices) {
+            selectedItineraryIndex = index
             selectedItinerary = list[index]
-            screen = Screen.Detail(index)
         }
     }
 

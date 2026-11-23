@@ -27,7 +27,7 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
 ## Versión
 
-APK debug **1.4.1** (`versionCode` 9).
+APK debug **1.5.0** (`versionCode` 10).
 
 ```bash
 export ANDROID_HOME=/home/agentes/android-sdk

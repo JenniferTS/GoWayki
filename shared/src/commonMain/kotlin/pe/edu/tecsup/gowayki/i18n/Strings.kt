@@ -103,6 +103,11 @@ data class Strings(
     val retryScores: String,
     val pendingScores: String,
     val viewDetail: String,
+    val stepByStep: String,
+    val takeLine: String,
+    val boardAt: String,
+    val alightAt: String,
+    val walkStraightHint: String,
 )
 
 object StringCatalog {
@@ -207,6 +212,11 @@ object StringCatalog {
         retryScores = "Reintentar puntajes",
         pendingScores = "Puntajes pendientes",
         viewDetail = "Ver detalle de la ruta",
+        stepByStep = "Paso a paso",
+        takeLine = "Toma la",
+        boardAt = "Sube en",
+        alightAt = "Baja en",
+        walkStraightHint = "Camina hacia el paradero (ruta peatonal estimada).",
     )
 
     private val en = Strings(
@@ -310,6 +320,11 @@ object StringCatalog {
         retryScores = "Retry scores",
         pendingScores = "Pending scores",
         viewDetail = "View route details",
+        stepByStep = "Step by step",
+        takeLine = "Take",
+        boardAt = "Board at",
+        alightAt = "Alight at",
+        walkStraightHint = "Walk to the stop (estimated pedestrian path).",
     )
 
     fun forLocale(locale: AppLocale): Strings = when (locale) {

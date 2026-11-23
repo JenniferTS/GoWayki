@@ -21,6 +21,7 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
@@ -68,7 +69,9 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                         view.onStart()
                         view.onResume()
                         view.getMapAsync { map ->
-                            map.uiSettings.isCompassEnabled = false
+                            map.uiSettings.isCompassEnabled = true
+                            map.uiSettings.isAttributionEnabled = false
+                            map.uiSettings.isLogoEnabled = false
                             map.setStyle(Style.Builder().fromUri(styleFile!!.toURI().toString())) { style ->
                                 ensureSources(style)
                                 fitHolder.key = applyOverlay(style, map, overlay, fitHolder.key, forceFit = true)
@@ -105,6 +108,11 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
 
 private class FitKeyHolder(var key: String = "")
 
+private const val WALK_SOURCE = "gowayki-walk"
+private const val WALK_LAYER = "gowayki-walk-line"
+private const val TRANSIT_SOURCE = "gowayki-transit"
+private const val TRANSIT_CASING = "gowayki-transit-casing"
+private const val TRANSIT_LAYER = "gowayki-transit-line"
 private const val ROUTE_SOURCE = "gowayki-route"
 private const val ROUTE_CASING = "gowayki-route-casing"
 private const val ROUTE_LAYER = "gowayki-route-line"
@@ -118,6 +126,39 @@ private const val ENDPOINT_SOURCE = "gowayki-endpoints"
 private const val ENDPOINT_LAYER = "gowayki-endpoints-circle"
 
 private fun ensureSources(style: Style) {
+    if (style.getSource(WALK_SOURCE) == null) {
+        style.addSource(GeoJsonSource(WALK_SOURCE))
+        style.addLayer(
+            LineLayer(WALK_LAYER, WALK_SOURCE).withProperties(
+                PropertyFactory.lineColor(AndroidColor.parseColor("#5C6B73")),
+                PropertyFactory.lineWidth(4.5f),
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineDasharray(arrayOf(1.2f, 1.6f)),
+                PropertyFactory.lineOpacity(0.95f),
+            ),
+        )
+    }
+    if (style.getSource(TRANSIT_SOURCE) == null) {
+        style.addSource(GeoJsonSource(TRANSIT_SOURCE))
+        style.addLayer(
+            LineLayer(TRANSIT_CASING, TRANSIT_SOURCE).withProperties(
+                PropertyFactory.lineColor(AndroidColor.WHITE),
+                PropertyFactory.lineWidth(11f),
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineOpacity(0.95f),
+            ),
+        )
+        style.addLayer(
+            LineLayer(TRANSIT_LAYER, TRANSIT_SOURCE).withProperties(
+                PropertyFactory.lineColor(Expression.get("color")),
+                PropertyFactory.lineWidth(6f),
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+            ),
+        )
+    }
     if (style.getSource(ROUTE_SOURCE) == null) {
         style.addSource(GeoJsonSource(ROUTE_SOURCE))
         style.addLayer(
@@ -165,9 +206,9 @@ private fun ensureSources(style: Style) {
         style.addSource(GeoJsonSource(ENDPOINT_SOURCE))
         style.addLayer(
             CircleLayer(ENDPOINT_LAYER, ENDPOINT_SOURCE).withProperties(
-                PropertyFactory.circleRadius(9f),
-                PropertyFactory.circleColor(AndroidColor.parseColor("#1F6FE5")),
-                PropertyFactory.circleStrokeWidth(2.5f),
+                PropertyFactory.circleRadius(10f),
+                PropertyFactory.circleColor(Expression.get("role")),
+                PropertyFactory.circleStrokeWidth(3f),
                 PropertyFactory.circleStrokeColor(AndroidColor.WHITE),
             ),
         )
@@ -176,21 +217,39 @@ private fun ensureSources(style: Style) {
         style.addSource(GeoJsonSource(USER_SOURCE))
         style.addLayer(
             CircleLayer(USER_LAYER, USER_SOURCE).withProperties(
-                PropertyFactory.circleRadius(8.5f),
+                PropertyFactory.circleRadius(9f),
                 PropertyFactory.circleColor(AndroidColor.parseColor("#1E88E5")),
-                PropertyFactory.circleStrokeWidth(2.5f),
+                PropertyFactory.circleStrokeWidth(3f),
                 PropertyFactory.circleStrokeColor(AndroidColor.WHITE),
             ),
         )
     }
 }
 
-private fun routeFingerprint(route: List<GeoPoint>): String {
-    if (route.isEmpty()) return "empty"
-    val first = route.first()
-    val last = route.last()
-    val mid = route[route.size / 2]
-    return "${route.size}|${first.latitude},${first.longitude}|${mid.latitude},${mid.longitude}|${last.latitude},${last.longitude}"
+private fun routeFingerprint(route: List<GeoPoint>, segments: List<RouteSegment>): String {
+    val base = if (segments.isNotEmpty()) {
+        segments.joinToString(";") {
+            val pts = it.points
+            if (pts.isEmpty()) it.kind.name
+            else "${it.kind}:${pts.size}:${pts.first().latitude},${pts.last().longitude}"
+        }
+    } else if (route.isEmpty()) {
+        "empty"
+    } else {
+        val first = route.first()
+        val last = route.last()
+        "${route.size}|${first.latitude},${first.longitude}|${last.latitude},${last.longitude}"
+    }
+    return base
+}
+
+private fun toLineFeature(points: List<GeoPoint>, colorHex: String? = null): Feature? {
+    val clean = dedupeNearby(points)
+    if (clean.size < 2) return null
+    val line = LineString.fromLngLats(clean.map { Point.fromLngLat(it.longitude, it.latitude) })
+    return Feature.fromGeometry(line).also { f ->
+        if (colorHex != null) f.addStringProperty("color", colorHex)
+    }
 }
 
 private fun applyOverlay(
@@ -200,18 +259,42 @@ private fun applyOverlay(
     previousFitKey: String,
     forceFit: Boolean,
 ): String {
-    val route = dedupeNearby(overlay.route)
-    style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.let { routeSource ->
-        if (route.size >= 2) {
-            val line = LineString.fromLngLats(route.map { Point.fromLngLat(it.longitude, it.latitude) })
-            routeSource.setGeoJson(Feature.fromGeometry(line))
-        } else {
-            routeSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+    val segments = overlay.segments
+    val fallbackRoute = dedupeNearby(overlay.route)
+
+    if (segments.isNotEmpty()) {
+        val walkFeatures = segments.filter { it.kind == RouteKind.Walk }.mapNotNull {
+            toLineFeature(it.points)
+        }
+        val transitFeatures = segments.filter { it.kind == RouteKind.Transit }.mapNotNull {
+            toLineFeature(it.points, it.colorHex)
+        }
+        style.getSourceAs<GeoJsonSource>(WALK_SOURCE)
+            ?.setGeoJson(FeatureCollection.fromFeatures(walkFeatures))
+        style.getSourceAs<GeoJsonSource>(TRANSIT_SOURCE)
+            ?.setGeoJson(FeatureCollection.fromFeatures(transitFeatures))
+        style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)
+            ?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+    } else {
+        style.getSourceAs<GeoJsonSource>(WALK_SOURCE)
+            ?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        style.getSourceAs<GeoJsonSource>(TRANSIT_SOURCE)
+            ?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.let { routeSource ->
+            if (fallbackRoute.size >= 2) {
+                val line = LineString.fromLngLats(
+                    fallbackRoute.map { Point.fromLngLat(it.longitude, it.latitude) },
+                )
+                routeSource.setGeoJson(Feature.fromGeometry(line))
+            } else {
+                routeSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+            }
         }
     }
+
     style.getSourceAs<GeoJsonSource>(STOP_SOURCE)?.setGeoJson(
         FeatureCollection.fromFeatures(
-            overlay.stops.take(120).map {
+            overlay.stops.take(140).map {
                 Feature.fromGeometry(Point.fromLngLat(it.longitude, it.latitude))
             },
         ),
@@ -223,19 +306,24 @@ private fun applyOverlay(
             },
         ),
     )
+
+    val path = overlay.effectiveRoute.let(::dedupeNearby)
     val endpoints = buildList {
-        if (route.size >= 2) {
-            add(route.first())
-            add(route.last())
+        if (path.size >= 2) {
+            add(path.first() to "#34A853") // Google-like green start
+            add(path.last() to "#EA4335") // Google-like red end
         }
     }
     style.getSourceAs<GeoJsonSource>(ENDPOINT_SOURCE)?.setGeoJson(
         FeatureCollection.fromFeatures(
-            endpoints.map {
-                Feature.fromGeometry(Point.fromLngLat(it.longitude, it.latitude))
+            endpoints.map { (p, color) ->
+                Feature.fromGeometry(Point.fromLngLat(p.longitude, p.latitude)).also {
+                    it.addStringProperty("role", color)
+                }
             },
         ),
     )
+
     style.getSourceAs<GeoJsonSource>(USER_SOURCE)?.let { userSource ->
         val u = overlay.user
         if (u != null) {
@@ -245,18 +333,17 @@ private fun applyOverlay(
         }
     }
 
-    val fitKey = routeFingerprint(route) + "|" +
+    val fitKey = routeFingerprint(fallbackRoute, segments) + "|" +
         (overlay.camera?.let { "${it.latitude},${it.longitude}" } ?: "") + "|${overlay.zoom}"
     if (forceFit || fitKey != previousFitKey) {
-        if (route.size >= 2) {
+        if (path.size >= 2) {
             val builder = LatLngBounds.Builder()
-            route.forEach { builder.include(LatLng(it.latitude, it.longitude)) }
+            path.forEach { builder.include(LatLng(it.latitude, it.longitude)) }
             overlay.user?.let { builder.include(LatLng(it.latitude, it.longitude)) }
-            overlay.markers.take(8).forEach { builder.include(LatLng(it.latitude, it.longitude)) }
             runCatching {
-                map.easeCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 56), 450)
+                map.easeCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 72), 480)
             }.onFailure {
-                val mid = route[route.size / 2]
+                val mid = path[path.size / 2]
                 map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(mid.latitude, mid.longitude), overlay.zoom))
             }
         } else {
