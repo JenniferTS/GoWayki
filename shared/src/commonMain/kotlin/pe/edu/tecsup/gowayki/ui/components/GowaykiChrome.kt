@@ -1,14 +1,19 @@
 package pe.edu.tecsup.gowayki.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -25,10 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
@@ -47,6 +49,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
@@ -133,6 +136,27 @@ fun BrandMark(
 }
 
 @Composable
+private fun PressScale(
+    reduce: Boolean,
+    pressed: Boolean,
+): Float {
+    val target = when {
+        reduce -> 1f
+        pressed -> 0.94f
+        else -> 1f
+    }
+    val scale by animateFloatAsState(
+        targetValue = target,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "btnScale",
+    )
+    return scale
+}
+
+@Composable
 fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
@@ -142,25 +166,75 @@ fun PrimaryButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val reduce = LocalMotionPrefs.current.reduceMotion
-    val scale = if (reduce) 1f else if (pressed) 0.97f else 1f
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        interactionSource = interaction,
+    val scale = PressScale(reduce, pressed && enabled)
+    val shape = RoundedCornerShape(GowaykiRadius.pill)
+    val shimmer = remember { Animatable(0f) }
+    LaunchedEffect(enabled, reduce) {
+        if (!enabled || reduce) {
+            shimmer.snapTo(0f)
+            return@LaunchedEffect
+        }
+        while (true) {
+            shimmer.animateTo(1f, tween(1800))
+            shimmer.snapTo(0f)
+        }
+    }
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .height(56.dp)
             .scale(scale)
-            .shadow(if (enabled) 10.dp else 0.dp, RoundedCornerShape(GowaykiRadius.pill), spotColor = GowaykiColors.Glow),
-        shape = RoundedCornerShape(GowaykiRadius.pill),
-        colors = ButtonDefaults.buttonColors(
-            backgroundColor = GowaykiColors.Terracotta,
-            contentColor = Color.White,
-            disabledBackgroundColor = GowaykiColors.Sand,
-        ),
-        elevation = ButtonDefaults.elevation(0.dp, 0.dp, 0.dp),
+            .shadow(
+                elevation = if (enabled) if (pressed) 4.dp else 14.dp else 0.dp,
+                shape = shape,
+                spotColor = GowaykiColors.Glow,
+                ambientColor = GowaykiColors.Terracotta.copy(alpha = 0.25f),
+            )
+            .clip(shape)
+            .background(
+                if (enabled) {
+                    Brush.horizontalGradient(
+                        listOf(
+                            GowaykiColors.Terracotta,
+                            Color(0xFFD46A3E),
+                            GowaykiColors.Amber,
+                        ),
+                    )
+                } else {
+                    Brush.horizontalGradient(listOf(GowaykiColors.Sand, GowaykiColors.Sand))
+                },
+            )
+            .then(
+                if (enabled) {
+                    Modifier
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.22f * (1f - shimmer.value)),
+                                    Color.Transparent,
+                                    Color.White.copy(alpha = 0.12f * shimmer.value),
+                                ),
+                            ),
+                        )
+                        .clickable(
+                            interactionSource = interaction,
+                            indication = null,
+                            onClick = onClick,
+                        )
+                } else {
+                    Modifier
+                },
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.button)
+        Text(
+            text = text,
+            color = if (enabled) Color.White else GowaykiColors.Stone,
+            style = MaterialTheme.typography.button,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
     }
 }
 
@@ -170,12 +244,40 @@ fun SoftButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(50.dp),
-        shape = RoundedCornerShape(GowaykiRadius.pill),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = GowaykiColors.Charcoal),
-    ) { Text(text) }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val reduce = LocalMotionPrefs.current.reduceMotion
+    val scale = PressScale(reduce, pressed)
+    val shape = RoundedCornerShape(GowaykiRadius.pill)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .scale(scale)
+            .shadow(
+                elevation = if (pressed) 2.dp else 6.dp,
+                shape = shape,
+                spotColor = Color(0x22000000),
+            )
+            .clip(shape)
+            .background(GowaykiColors.SurfaceElevated)
+            .border(1.5.dp, GowaykiColors.Terracotta.copy(alpha = 0.35f), shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = GowaykiColors.Charcoal,
+            style = MaterialTheme.typography.button,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 14.dp),
+        )
+    }
 }
 
 @Composable
@@ -184,9 +286,24 @@ fun GlassPanel(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val reduce = LocalMotionPrefs.current.reduceMotion
+    val scale = if (onClick == null) 1f else PressScale(reduce, pressed)
     Surface(
         modifier = modifier
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .scale(scale)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = onClick,
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .shadow(12.dp, RoundedCornerShape(GowaykiRadius.lg), spotColor = Color(0x22000000)),
         color = GowaykiColors.SurfaceElevated.copy(alpha = 0.95f),
         shape = RoundedCornerShape(GowaykiRadius.lg),
@@ -213,17 +330,23 @@ fun BottomNavBar(
         ) {
             items.forEachIndexed { index, (label, action) ->
                 val active = index == activeIndex
+                val scale by animateFloatAsState(
+                    targetValue = if (active) 1.06f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "navScale",
+                )
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
+                        .scale(scale)
                         .clip(RoundedCornerShape(18.dp))
                         .clickable(onClick = action)
-                        .background(if (active) GowaykiColors.Terracotta.copy(alpha = 0.1f) else Color.Transparent)
+                        .background(if (active) GowaykiColors.Terracotta.copy(alpha = 0.12f) else Color.Transparent)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Box(
                         Modifier
-                            .size(if (active) 9.dp else 6.dp)
+                            .size(if (active) 10.dp else 6.dp)
                             .clip(CircleShape)
                             .background(if (active) GowaykiColors.Terracotta else GowaykiColors.Outline),
                     )

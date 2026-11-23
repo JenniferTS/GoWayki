@@ -34,6 +34,7 @@ object GowaykiColors {
     val TransitInbound = Color(0xFFC93B6E)
     val Success = Color(0xFF2F6F4E)
     val Warning = Color(0xFFC47A1A)
+    val Amber = Color(0xFFE08A3A)
     val Night = Color(0xFF12100E)
     val Glow = Color(0x33C45A32)
 }
