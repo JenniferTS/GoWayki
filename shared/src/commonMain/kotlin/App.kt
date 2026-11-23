@@ -25,7 +25,7 @@ import pe.edu.tecsup.gowayki.ui.screens.OnboardingScreen
 import pe.edu.tecsup.gowayki.ui.screens.ProfileScreen
 import pe.edu.tecsup.gowayki.ui.screens.RankingScreen
 import pe.edu.tecsup.gowayki.ui.screens.ReportsScreen
-import pe.edu.tecsup.gowayki.ui.screens.ResultsScreen
+import pe.edu.tecsup.gowayki.ui.screens.MapsJourneyScreen
 import pe.edu.tecsup.gowayki.ui.screens.SearchScreen
 import pe.edu.tecsup.gowayki.ui.screens.SettingsScreen
 import pe.edu.tecsup.gowayki.ui.screens.SplashScreen
@@ -77,7 +77,7 @@ fun App() {
                 Screen.Onboarding -> OnboardingScreen(session)
                 Screen.Home -> HomeScreen(session)
                 Screen.Search -> SearchScreen(session)
-                Screen.Results -> ResultsScreen(session)
+                Screen.Results -> MapsJourneyScreen(session)
                 is Screen.Detail -> DetailScreen(session)
                 Screen.Reports -> ReportsScreen(session)
                 Screen.Profile -> ProfileScreen(session)

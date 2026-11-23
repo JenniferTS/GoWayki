@@ -410,12 +410,9 @@ fun DetailScreen(session: AppSession) {
                 CityMap(
                     modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(GowaykiRadius.lg)),
                     overlay = MapOverlay(
-                        route = session.routeGeometry(trip),
-                        markers = session.routeEndpoints(trip),
-                        stops = trip.legs.filterIsInstance<TransitLeg>().flatMap { leg ->
-                            (listOf(leg.boardingStop) + leg.intermediateStops + listOf(leg.alightingStop))
-                                .map { pe.edu.tecsup.gowayki.domain.planner.GeoPoint(it.latitude, it.longitude) }
-                        },
+                        segments = pe.edu.tecsup.gowayki.ui.map.itinerarySegments(trip),
+                        markers = pe.edu.tecsup.gowayki.ui.map.itineraryEndpoints(trip),
+                        stops = pe.edu.tecsup.gowayki.ui.map.itineraryStops(trip),
                         zoom = 13.0,
                     ),
                 )
@@ -546,7 +543,8 @@ fun ActiveTripScreen(session: AppSession) {
                 CityMap(
                     modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(GowaykiRadius.lg)),
                     overlay = MapOverlay(
-                        route = session.routeGeometry(state.trip),
+                        segments = pe.edu.tecsup.gowayki.ui.map.itinerarySegments(state.trip),
+                        stops = pe.edu.tecsup.gowayki.ui.map.itineraryStops(state.trip),
                         user = state.progress.fix?.point,
                         camera = state.progress.fix?.point ?: state.trip.legs.getOrNull(state.progress.legIndex)?.from,
                         zoom = 14.0,
