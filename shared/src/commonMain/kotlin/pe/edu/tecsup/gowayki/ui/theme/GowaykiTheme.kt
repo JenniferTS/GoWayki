@@ -61,7 +61,8 @@ object GowaykiMotion {
     fun <T> soft() = tween<T>(TransitionMs, easing = FastOutSlowInEasing)
     fun <T> micro() = tween<T>(MicroMs, easing = FastOutSlowInEasing)
     fun <T> emphasized() = tween<T>(EmphasizedMs, easing = FastOutSlowInEasing)
-    fun <T> none() = tween<T>(0)
+    /** One-shot “sin animación”; no usar dentro de infiniteRepeatable. */
+    fun <T> none() = tween<T>(1)
     fun <T> snappy() = spring<T>(
         dampingRatio = Spring.DampingRatioMediumBouncy,
         stiffness = Spring.StiffnessMediumLow,

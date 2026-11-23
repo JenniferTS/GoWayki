@@ -73,8 +73,10 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                             map.uiSettings.isAttributionEnabled = false
                             map.uiSettings.isLogoEnabled = false
                             map.setStyle(Style.Builder().fromUri(styleFile!!.toURI().toString())) { style ->
-                                ensureSources(style)
-                                fitHolder.key = applyOverlay(style, map, overlay, fitHolder.key, forceFit = true)
+                                runCatching {
+                                    ensureSources(style)
+                                    fitHolder.key = applyOverlay(style, map, overlay, fitHolder.key, forceFit = true)
+                                }
                             }
                         }
                     }
@@ -82,8 +84,12 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                 update = { view ->
                     view.getMapAsync { map ->
                         map.getStyle { style ->
-                            ensureSources(style)
-                            fitHolder.key = applyOverlay(style, map, overlay, fitHolder.key, forceFit = false)
+                            runCatching {
+                                ensureSources(style)
+                                fitHolder.key = applyOverlay(style, map, overlay, fitHolder.key, forceFit = false)
+                            }.onFailure {
+                                // No tumbar la Activity si el estilo aún no está listo o la cota es inválida.
+                            }
                         }
                     }
                 },

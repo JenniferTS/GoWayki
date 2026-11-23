@@ -3,6 +3,11 @@ package pe.edu.tecsup.gowayki.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import pe.edu.tecsup.gowayki.domain.auth.SignedInUser
 import pe.edu.tecsup.gowayki.domain.community.CommunityReport
 import pe.edu.tecsup.gowayki.domain.community.InMemoryReportsRepository
@@ -176,6 +181,7 @@ class AppSession(
     private var tracker: TripTracker? = null
     private var stopLocationWatch: (() -> Unit)? = null
     private var stopUserLocationWatchHandle: (() -> Unit)? = null
+    private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val strings: Strings get() = StringCatalog.forLocale(locale)
     val baseFare: Money get() = Money.BASE
@@ -426,36 +432,42 @@ class AppSession(
             planError = strings.errorGeneric
             return
         }
+        if (planning) return
         planning = true
         planError = null
-        try {
-            val network = networkProvider?.invoke()
-            journey = if (network == null) {
-                demoJourney(from, to)
-            } else {
-                JourneyPlanner(network).plan(
-                    JourneyRequest(
-                        origin = from,
-                        destination = to,
-                        time = JourneyTime.now(),
-                    ),
-                )
+        sessionScope.launch {
+            val planned = withContext(Dispatchers.Default) {
+                runCatching {
+                    val network = networkProvider?.invoke()
+                    if (network == null) {
+                        demoJourney(from, to)
+                    } else {
+                        JourneyPlanner(network).plan(
+                            JourneyRequest(
+                                origin = from,
+                                destination = to,
+                                time = JourneyTime.now(),
+                            ),
+                        )
+                    }
+                }
             }
-            val response = journey
-            if (response != null &&
-                response.status == JourneyStatus.Success &&
-                response.itineraries.isNotEmpty()
-            ) {
-                rememberRecentTrip()
-                screen = Screen.Results
-            } else {
-                planError = strings.emptyRoutes
-                screen = Screen.Results
-            }
-        } catch (t: Throwable) {
-            planError = t.message ?: strings.errorGeneric
-        } finally {
             planning = false
+            planned.onSuccess { response ->
+                journey = response
+                if (response.status == JourneyStatus.Success && response.itineraries.isNotEmpty()) {
+                    selectedItineraryIndex = 0
+                    selectedItinerary = response.itineraries.first()
+                    rememberRecentTrip()
+                    planError = null
+                } else {
+                    selectedItinerary = null
+                    planError = strings.emptyRoutes
+                }
+                screen = Screen.Results
+            }.onFailure { t ->
+                planError = t.message ?: strings.errorGeneric
+            }
         }
     }
 

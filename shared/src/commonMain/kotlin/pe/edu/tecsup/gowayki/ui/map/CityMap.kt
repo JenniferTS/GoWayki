@@ -41,19 +41,22 @@ data class MapOverlay(
 fun itinerarySegments(trip: Itinerary?): List<RouteSegment> {
     if (trip == null) return emptyList()
     return trip.legs.mapNotNull { leg ->
-        val pts = when {
+        val raw = when {
             leg.geometry.size >= 2 -> leg.geometry
-            else -> densify(listOf(leg.from, leg.to), steps = 8)
+            else -> listOf(leg.from, leg.to)
         }
         when (leg) {
-            is WalkLeg -> RouteSegment(
-                points = densify(pts, steps = 6),
-                kind = RouteKind.Walk,
-                colorHex = "#5C6B73",
-                label = "Caminar",
-            )
+            is WalkLeg -> {
+                val base = if (raw.size <= 2) densify(raw, steps = 8) else raw
+                RouteSegment(
+                    points = downsample(base, maxPoints = 64),
+                    kind = RouteKind.Walk,
+                    colorHex = "#5C6B73",
+                    label = "Caminar",
+                )
+            }
             is TransitLeg -> RouteSegment(
-                points = pts,
+                points = downsample(raw, maxPoints = 160),
                 kind = RouteKind.Transit,
                 colorHex = normalizeHex(leg.color),
                 label = leg.lineName,
@@ -65,9 +68,10 @@ fun itinerarySegments(trip: Itinerary?): List<RouteSegment> {
 fun itineraryStops(trip: Itinerary?): List<GeoPoint> {
     if (trip == null) return emptyList()
     return trip.legs.filterIsInstance<TransitLeg>().flatMap { leg ->
-        (listOf(leg.boardingStop) + leg.intermediateStops.take(24) + listOf(leg.alightingStop))
+        (listOf(leg.boardingStop) + leg.intermediateStops.take(16) + listOf(leg.alightingStop))
             .map { GeoPoint(it.latitude, it.longitude) }
-    }
+    }.distinctBy { "${"%.5f".format(it.latitude)},${"%.5f".format(it.longitude)}" }
+        .take(80)
 }
 
 fun itineraryEndpoints(trip: Itinerary?): List<GeoPoint> {
@@ -98,6 +102,20 @@ private fun densify(points: List<GeoPoint>, steps: Int): List<GeoPoint> {
                 ),
             )
         }
+    }
+    out.add(points.last())
+    return out
+}
+
+/** Evita polilíneas enormes que tiran el mapa / OOM al planificar. */
+private fun downsample(points: List<GeoPoint>, maxPoints: Int): List<GeoPoint> {
+    if (points.size <= maxPoints || maxPoints < 3) return points
+    val out = ArrayList<GeoPoint>(maxPoints)
+    out.add(points.first())
+    val step = (points.size - 1).toDouble() / (maxPoints - 1)
+    for (i in 1 until maxPoints - 1) {
+        val idx = (i * step).toInt().coerceIn(1, points.lastIndex - 1)
+        out.add(points[idx])
     }
     out.add(points.last())
     return out

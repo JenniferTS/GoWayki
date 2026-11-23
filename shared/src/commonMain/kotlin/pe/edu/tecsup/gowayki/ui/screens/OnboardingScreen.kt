@@ -286,15 +286,17 @@ private fun StepPips(step: Int, total: Int, accent: Color) {
 
 @Composable
 private fun FloatingBlobs(accent: Color, reduce: Boolean) {
-    val infinite = rememberInfiniteTransition()
-    val drift by infinite.animateFloat(
+    val infinite = rememberInfiniteTransition(label = "onboardBlobs")
+    val driftAnim by infinite.animateFloat(
         initialValue = -8f,
         targetValue = 10f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (reduce) 0 else 3200, easing = FastOutSlowInEasing),
+            animation = tween(3200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
+        label = "blobDrift",
     )
+    val drift = if (reduce) 0f else driftAnim
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier

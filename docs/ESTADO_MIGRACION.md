@@ -27,7 +27,7 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 
 ## Versión
 
-APK debug **1.5.3** (`versionCode` 13) — login Google (SHA debug) + logo adjunto. Anterior: 1.5.2 tipografías (`versionCode` 12).
+APK debug **1.5.4** (`versionCode` 14) — fix crash Buscar rutas. Anterior: 1.5.3 (`versionCode` 13).
 
 ```bash
 export ANDROID_HOME=/home/agentes/android-sdk

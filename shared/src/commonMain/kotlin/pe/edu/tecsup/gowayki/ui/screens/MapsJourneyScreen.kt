@@ -95,15 +95,18 @@ fun MapsJourneyScreen(session: AppSession) {
     val stops = remember(trip) { itineraryStops(trip) }
     val ends = remember(trip) { itineraryEndpoints(trip) }
 
-    val fabPulse = rememberInfiniteTransition()
-    val fabScale by fabPulse.animateFloat(
+    // Nunca usar tween(0) en infiniteRepeatable: tumba Compose al abrir resultados.
+    val fabPulse = rememberInfiniteTransition(label = "locFab")
+    val fabPulseScale by fabPulse.animateFloat(
         initialValue = 1f,
-        targetValue = if (session.locating && !reduce) 1.08f else 1f,
+        targetValue = 1.08f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (reduce || !session.locating) 0 else 700),
+            animation = tween(700),
             repeatMode = RepeatMode.Reverse,
         ),
+        label = "locFabScale",
     )
+    val fabScale = if (session.locating && !reduce) fabPulseScale else 1f
     val sheetEnter = remember { Animatable(if (reduce) 0f else 48f) }
     LaunchedEffect(Unit) {
         if (!reduce) sheetEnter.animateTo(0f, GowaykiMotion.emphasized())
