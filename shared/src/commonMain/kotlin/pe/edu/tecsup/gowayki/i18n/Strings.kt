@@ -107,7 +107,7 @@ data class Strings(
 
 object StringCatalog {
     private val es = Strings(
-        appName = "GoWayki",
+        appName = "gowayki go",
         skip = "Omitir",
         next = "Siguiente",
         back = "Anterior",
@@ -131,7 +131,7 @@ object StringCatalog {
         minutesApprox = "min aprox.",
         walking = "caminata",
         transfers = "transbordos",
-        communityDisclaimer = "Información de la comunidad, no verificada por GoWayki.",
+        communityDisclaimer = "Información de la comunidad, no verificada por gowayki go.",
         reportTitle = "Reportar incidente",
         reportHeavyTraffic = "Tráfico intenso",
         reportDetour = "Desvío",
@@ -210,7 +210,7 @@ object StringCatalog {
     )
 
     private val en = Strings(
-        appName = "GoWayki",
+        appName = "gowayki go",
         skip = "Skip",
         next = "Next",
         back = "Back",
@@ -234,7 +234,7 @@ object StringCatalog {
         minutesApprox = "min approx.",
         walking = "walking",
         transfers = "transfers",
-        communityDisclaimer = "Community information, not verified by GoWayki.",
+        communityDisclaimer = "Community information, not verified by gowayki go.",
         reportTitle = "Report an issue",
         reportHeavyTraffic = "Heavy traffic",
         reportDetour = "Detour",

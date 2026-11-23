@@ -1,10 +1,12 @@
-# GoWayki UI — dirección visual (v1.3)
+# gowayki go UI — identidad visual (v1.4)
 
-## Marca
-- **Zorro andino**: terracota `#C45A32`, carbón `#1A1714`, arena `#E8D5BC`, niebla `#F6F1EA`
-- Acento ruta: azul combi `#1F6FE5` (ida) / fucsia suave `#C93B6E` (vuelta)
-- Tipografía: escala densa y expresiva (display 34 / title 22 / body 16 / caption 13)
-- No flat: fondo con velo radial + franja inferior cálida
+## Marca (manual + hoja Drive)
+- Nombre: **gowayki go** (go naranja + wayki tinta)
+- Primarios: naranja `#F05709`, tinta `#292929`
+- Acentos: `#F98E00`, `#E84513`, `#BC5433`
+- Tipografías de marca: Righteous / Ubuntu / Poppins → Sans bold en app
+- Logo isotipo: zorro-G con nodos de red (launcher + BrandLogo)
+- Iconos UI: set lúdico stroke redondeado (estilo Phosphor/Bootstrap)
 
 ## Motion (respeta “movimiento reducido”)
 1. Entrada de pantalla: fade + slide 18 dp (~280 ms)

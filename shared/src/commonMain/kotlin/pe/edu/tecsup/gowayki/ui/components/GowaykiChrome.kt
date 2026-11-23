@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -48,8 +49,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
@@ -121,16 +126,33 @@ fun EnterContent(
 fun BrandMark(
     subtitle: String? = null,
     large: Boolean = false,
+    showLogo: Boolean = true,
+    light: Boolean = false,
 ) {
-    Column {
-        Text(
-            "GoWayki",
-            style = if (large) MaterialTheme.typography.h3 else MaterialTheme.typography.h4,
-            color = GowaykiColors.Terracotta,
-            fontWeight = FontWeight.Bold,
-        )
-        if (subtitle != null) {
-            Text(subtitle, style = MaterialTheme.typography.body2, color = GowaykiColors.Stone)
+    val ink = if (light) Color.White else GowaykiColors.BrandInk
+    val go = if (light) Color(0xFFFFC4A3) else GowaykiColors.BrandOrange
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (showLogo) {
+            BrandLogo(size = if (large) 58.dp else 40.dp)
+            Spacer(Modifier.size(10.dp))
+        }
+        Column {
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = go, fontWeight = FontWeight.Black)) { append("go") }
+                    withStyle(SpanStyle(color = ink, fontWeight = FontWeight.Black)) { append("wayki") }
+                    append(" ")
+                    withStyle(SpanStyle(color = go, fontWeight = FontWeight.Bold)) { append("go") }
+                },
+                style = if (large) MaterialTheme.typography.h3 else MaterialTheme.typography.h4,
+            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.body2,
+                    color = if (light) Color.White.copy(alpha = 0.9f) else GowaykiColors.Stone,
+                )
+            }
         }
     }
 }
@@ -195,9 +217,9 @@ fun PrimaryButton(
                 if (enabled) {
                     Brush.horizontalGradient(
                         listOf(
-                            GowaykiColors.Terracotta,
-                            Color(0xFFD46A3E),
-                            GowaykiColors.Amber,
+                            GowaykiColors.BrandOrangeHot,
+                            GowaykiColors.BrandOrange,
+                            GowaykiColors.BrandAmber,
                         ),
                     )
                 } else {
@@ -313,9 +335,15 @@ fun GlassPanel(
     }
 }
 
+data class NavItem(
+    val label: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
+
 @Composable
 fun BottomNavBar(
-    items: List<Pair<String, () -> Unit>>,
+    items: List<NavItem>,
     activeIndex: Int,
 ) {
     Surface(
@@ -328,10 +356,10 @@ fun BottomNavBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            items.forEachIndexed { index, (label, action) ->
+            items.forEachIndexed { index, item ->
                 val active = index == activeIndex
                 val scale by animateFloatAsState(
-                    targetValue = if (active) 1.06f else 1f,
+                    targetValue = if (active) 1.08f else 1f,
                     animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                     label = "navScale",
                 )
@@ -340,22 +368,22 @@ fun BottomNavBar(
                     modifier = Modifier
                         .scale(scale)
                         .clip(RoundedCornerShape(18.dp))
-                        .clickable(onClick = action)
-                        .background(if (active) GowaykiColors.Terracotta.copy(alpha = 0.12f) else Color.Transparent)
+                        .clickable(onClick = item.onClick)
+                        .background(if (active) GowaykiColors.BrandOrange.copy(alpha = 0.12f) else Color.Transparent)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
-                    Box(
-                        Modifier
-                            .size(if (active) 10.dp else 6.dp)
-                            .clip(CircleShape)
-                            .background(if (active) GowaykiColors.Terracotta else GowaykiColors.Outline),
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.label,
+                        tint = if (active) GowaykiColors.BrandOrange else GowaykiColors.Stone,
+                        modifier = Modifier.size(22.dp),
                     )
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        label,
-                        color = if (active) GowaykiColors.Terracotta else GowaykiColors.Stone,
+                        item.label,
+                        color = if (active) GowaykiColors.BrandOrange else GowaykiColors.Stone,
                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                     )
                 }
             }
@@ -376,7 +404,14 @@ fun ScreenHeader(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) {
-                TextButton(onClick = onBack) { Text("←") }
+                TextButton(onClick = onBack) {
+                    Icon(
+                        GowaykiIcons.Back,
+                        contentDescription = "Volver",
+                        tint = GowaykiColors.BrandOrange,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
             Text(title, style = MaterialTheme.typography.h5, fontWeight = FontWeight.Bold)
         }
