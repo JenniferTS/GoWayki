@@ -56,15 +56,26 @@ object GowaykiMotion {
     const val MicroMs = 160
     const val TransitionMs = 280
     const val EmphasizedMs = 420
-    const val StaggerMs = 55
+    const val StaggerMs = 48
 
     fun <T> soft() = tween<T>(TransitionMs, easing = FastOutSlowInEasing)
     fun <T> micro() = tween<T>(MicroMs, easing = FastOutSlowInEasing)
     fun <T> emphasized() = tween<T>(EmphasizedMs, easing = FastOutSlowInEasing)
     /** One-shot “sin animación”; no usar dentro de infiniteRepeatable. */
     fun <T> none() = tween<T>(1)
+    /** Press / logo: bounce contenido, no excesivo. */
     fun <T> snappy() = spring<T>(
         dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
+    /** Paneles y hojas: asienta rápido, sin rebote largo. */
+    fun <T> panel() = spring<T>(
+        dampingRatio = 0.86f,
+        stiffness = Spring.StiffnessMedium,
+    )
+    /** Selección de chip / tarjeta. */
+    fun <T> selection() = spring<T>(
+        dampingRatio = 0.92f,
         stiffness = Spring.StiffnessMediumLow,
     )
 }

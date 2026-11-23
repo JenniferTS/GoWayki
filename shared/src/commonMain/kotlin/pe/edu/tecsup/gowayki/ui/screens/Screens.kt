@@ -1,6 +1,7 @@
 package pe.edu.tecsup.gowayki.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -58,14 +61,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import pe.edu.tecsup.gowayki.domain.community.ReportKind
 import pe.edu.tecsup.gowayki.domain.planner.TransitLeg
 import pe.edu.tecsup.gowayki.domain.planner.WalkLeg
 import pe.edu.tecsup.gowayki.domain.preferences.AppLocale
 import pe.edu.tecsup.gowayki.domain.tracking.TripPhase
 import pe.edu.tecsup.gowayki.platform.AlarmMode
+import pe.edu.tecsup.gowayki.platform.HapticKind
+import pe.edu.tecsup.gowayki.platform.platformHaptic
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
+import pe.edu.tecsup.gowayki.ui.components.ActionConfirmBanner
 import pe.edu.tecsup.gowayki.ui.components.AtmosphereBackground
 import pe.edu.tecsup.gowayki.ui.components.BottomNavBar
 import pe.edu.tecsup.gowayki.ui.components.BrandHero
@@ -258,12 +265,35 @@ fun TutorialOverlay(session: AppSession) {
 @Composable
 fun SearchScreen(session: AppSession) {
     val s = session.strings
+    val reduce = LocalMotionPrefs.current.reduceMotion
+    var fieldFocused by remember { mutableStateOf(false) }
     AtmosphereBackground {
-        EnterContent(Modifier.padding(GowaykiSpace.md).fillMaxSize()) {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                ScreenHeader(s.findRoutes, onBack = { session.go(Screen.Home) })
+        EnterContent(Modifier.padding(GowaykiSpace.md).fillMaxSize().imePadding()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .animateContentSize(animationSpec = if (reduce) GowaykiMotion.none() else GowaykiMotion.panel()),
+            ) {
+                ScreenHeader(
+                    s.findRoutes,
+                    onBack = {
+                        if (session.journey?.itineraries?.isNotEmpty() == true) session.go(Screen.Results)
+                        else session.go(Screen.Home)
+                    },
+                )
                 Spacer(Modifier.height(8.dp))
-                GlassPanel(Modifier.fillMaxWidth()) {
+                GlassPanel(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (fieldFocused) {
+                                Modifier.border(2.dp, GowaykiColors.BrandOrange.copy(alpha = 0.45f), RoundedCornerShape(GowaykiRadius.lg))
+                            } else {
+                                Modifier
+                            },
+                        ),
+                ) {
                     OutlinedTextField(
                         value = session.originQuery,
                         onValueChange = {
@@ -272,7 +302,10 @@ fun SearchScreen(session: AppSession) {
                             session.searchPlaces(it)
                         },
                         label = { Text(s.searchOrigin) },
-                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = s.searchOrigin },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { fieldFocused = it.isFocused || fieldFocused && session.searchingDestination }
+                            .semantics { contentDescription = s.searchOrigin },
                         shape = RoundedCornerShape(GowaykiRadius.md),
                     )
                     Spacer(Modifier.height(10.dp))
@@ -284,17 +317,30 @@ fun SearchScreen(session: AppSession) {
                             session.searchPlaces(it)
                         },
                         label = { Text(s.searchDestination) },
-                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = s.searchDestination },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { fieldFocused = it.isFocused }
+                            .semantics { contentDescription = s.searchDestination },
                         shape = RoundedCornerShape(GowaykiRadius.md),
                     )
                 }
-                AnimatedVisibility(visible = session.searchHits.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+                AnimatedVisibility(
+                    visible = session.searchHits.isNotEmpty(),
+                    enter = fadeIn(if (reduce) GowaykiMotion.none() else GowaykiMotion.soft()),
+                    exit = fadeOut(GowaykiMotion.micro()),
+                ) {
                     GlassPanel(Modifier.fillMaxWidth().padding(top = 10.dp).height(160.dp)) {
                         LazyColumn {
                             itemsIndexed(session.searchHits) { _, hit ->
                                 Text(
                                     "${hit.name} · ${hit.address}",
-                                    modifier = Modifier.fillMaxWidth().clickable { session.selectPlace(hit) }.padding(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            session.selectPlace(hit)
+                                            if (!reduce) platformHaptic(HapticKind.Light)
+                                        }
+                                        .padding(10.dp),
                                 )
                             }
                         }
@@ -318,6 +364,10 @@ fun SearchScreen(session: AppSession) {
                     session.favorites.take(5).forEach { fav ->
                         Text(fav.name, modifier = Modifier.fillMaxWidth().clickable { session.applyFavorite(fav) }.padding(vertical = 6.dp))
                     }
+                }
+                if (session.journey?.itineraries?.isNotEmpty() == true) {
+                    Spacer(Modifier.height(8.dp))
+                    SoftButton(s.homeRoutes, onClick = { session.go(Screen.Results) })
                 }
                 Spacer(Modifier.height(12.dp))
                 PrimaryButton(
@@ -462,31 +512,49 @@ fun ReportsScreen(session: AppSession) {
         ReportKind.RoadBlocked to s.reportRoadBlocked,
         ReportKind.Other to s.reportOther,
     )
+    val showOk = session.reportMessage == "ok"
+    LaunchedEffect(showOk) {
+        if (showOk) {
+            platformHaptic(HapticKind.Success)
+            delay(2200)
+            if (session.reportMessage == "ok") session.reportMessage = null
+        }
+    }
     AtmosphereBackground {
-        EnterContent(Modifier.padding(GowaykiSpace.md).fillMaxSize()) {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                ScreenHeader(s.reportTitle, onBack = { session.go(Screen.Home) })
-                Text(s.communityDisclaimer, style = MaterialTheme.typography.caption)
-                Spacer(Modifier.height(12.dp))
-                kinds.forEach { (kind, label) ->
-                    val selected = session.reportKind == kind
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { session.reportKind = kind },
-                        color = if (selected) GowaykiColors.TerracottaSoft.copy(alpha = 0.55f) else GowaykiColors.SurfaceElevated,
+        Box(Modifier.fillMaxSize()) {
+            EnterContent(Modifier.padding(GowaykiSpace.md).fillMaxSize()) {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    ScreenHeader(s.reportTitle, onBack = { session.go(Screen.Home) })
+                    Text(s.communityDisclaimer, style = MaterialTheme.typography.caption)
+                    Spacer(Modifier.height(12.dp))
+                    kinds.forEach { (kind, label) ->
+                        val selected = session.reportKind == kind
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { session.reportKind = kind },
+                            color = if (selected) GowaykiColors.TerracottaSoft.copy(alpha = 0.55f) else GowaykiColors.SurfaceElevated,
+                            shape = RoundedCornerShape(GowaykiRadius.md),
+                        ) { Text(label, modifier = Modifier.padding(14.dp), fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal) }
+                    }
+                    OutlinedTextField(
+                        value = session.reportDescription,
+                        onValueChange = { session.reportDescription = it },
+                        label = { Text(s.reportDescription) },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(GowaykiRadius.md),
-                    ) { Text(label, modifier = Modifier.padding(14.dp), fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal) }
+                    )
+                    SoftButton(s.reportUseLocation, onClick = { session.useCurrentLocationForReport() })
+                    PrimaryButton(s.reportSubmit, onClick = { session.submitReport() })
+                    session.reportMessage?.let { if (it != "ok") Text(it, color = MaterialTheme.colors.error) }
                 }
-                OutlinedTextField(
-                    value = session.reportDescription,
-                    onValueChange = { session.reportDescription = it },
-                    label = { Text(s.reportDescription) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(GowaykiRadius.md),
-                )
-                SoftButton(s.reportUseLocation, onClick = { session.useCurrentLocationForReport() })
-                PrimaryButton(s.reportSubmit, onClick = { session.submitReport() })
-                session.reportMessage?.let { if (it != "ok") Text(it, color = MaterialTheme.colors.error) }
             }
+            ActionConfirmBanner(
+                visible = showOk,
+                message = if (session.locale.code == "en") "Report sent" else "Reporte enviado",
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+            )
         }
     }
 }

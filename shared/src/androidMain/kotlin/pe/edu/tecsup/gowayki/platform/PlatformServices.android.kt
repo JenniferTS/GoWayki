@@ -244,3 +244,29 @@ fun installAndroidPlatform(
 }
 
 private var pendingLocationCallback: ((Boolean) -> Unit)? = null
+
+actual fun platformHaptic(kind: HapticKind) {
+    val act = AndroidPlatformHost.activity ?: return
+    runCatching {
+        val vibrator = if (Build.VERSION.SDK_INT >= 31) {
+            val mgr = act.getSystemService(VibratorManager::class.java)
+            mgr?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            act.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        } ?: return
+        if (!vibrator.hasVibrator()) return
+        if (Build.VERSION.SDK_INT >= 29) {
+            val effect = when (kind) {
+                HapticKind.Light -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                HapticKind.Success -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+            }
+            vibrator.vibrate(effect)
+        } else if (Build.VERSION.SDK_INT >= 26) {
+            vibrator.vibrate(VibrationEffect.createOneShot(if (kind == HapticKind.Success) 28 else 12, 48))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(if (kind == HapticKind.Success) 28 else 12)
+        }
+    }
+}

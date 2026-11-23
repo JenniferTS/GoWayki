@@ -43,3 +43,8 @@ expect fun platformWatchUserLocation(onFix: (PlatformLocation) -> Unit): () -> U
 /** Preferir foreground service en Android; cae a [platformWatchTripLocation] si no hay. */
 expect fun platformStartTripTracking(onFix: (PositionFix) -> Unit): () -> Unit
 expect fun platformStopTripTracking()
+
+/** Feedback háptico discreto; no-op si el dispositivo lo desactiva. */
+enum class HapticKind { Light, Success }
+
+expect fun platformHaptic(kind: HapticKind)
