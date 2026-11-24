@@ -42,7 +42,7 @@ object AndroidLocationFix {
         var best: Location? = null
         for (p in providers) {
             val loc = runCatching { lm.getLastKnownLocation(p) }.getOrNull() ?: continue
-            if (best == null || loc.accuracy < best!!.accuracy) best = loc
+            if (best == null || loc.accuracy < best.accuracy) best = loc
         }
         val loc = best ?: return null
         return LocationFix(loc.latitude, loc.longitude, loc.accuracy)
