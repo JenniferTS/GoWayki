@@ -2,8 +2,10 @@ package com.myapplication
 
 import GowaykiRuntime
 import MainView
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.HandlerCompat
 import androidx.lifecycle.lifecycleScope
@@ -36,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private val mainHandler = HandlerCompat.createAsync(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         installAndroidPlatform(this)
@@ -97,6 +100,13 @@ class MainActivity : AppCompatActivity() {
         setContent {
             MainView()
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // uiMode está en configChanges: sin recrear la Activity, los íconos de las barras
+        // del sistema tienen que seguir al modo claro/oscuro nuevo.
+        enableEdgeToEdge()
     }
 
     private fun postAuthSuccess(user: SignedInUser) {

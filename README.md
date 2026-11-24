@@ -9,8 +9,8 @@ Ver `docs/ESTADO_MIGRACION.md`. Rama de trabajo: `feat/kmp-migration`.
 
 ## Requisitos
 
-- JDK 17+
-- Android SDK (`ANDROID_HOME`, p. ej. `/home/agentes/android-sdk`)
+- JDK 17+ (Gradle 8.14.8; el build compila con toolchain 17)
+- Android SDK (`ANDROID_HOME`, p. ej. `/home/agentes/android-sdk`) con platform 36 (compileSdk/targetSdk 36) y build-tools 36
 - iOS: macOS + Xcode (no validado en este servidor Linux)
 
 ## Compilar / probar

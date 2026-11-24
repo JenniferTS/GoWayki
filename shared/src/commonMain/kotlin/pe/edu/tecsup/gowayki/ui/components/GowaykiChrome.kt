@@ -28,7 +28,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,6 +76,7 @@ import pe.edu.tecsup.gowayki.ui.theme.GowaykiSpace
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiStroke
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiTheme
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiType
+import pe.edu.tecsup.gowayki.platform.SystemBackHandler
 import pe.edu.tecsup.gowayki.ui.theme.LocalMotionPrefs
 
 @Composable
@@ -138,8 +141,9 @@ fun EnterContent(
 }
 
 /**
- * Pantalla estándar: fondo de marca, entrada animada, cabecera fija y cuerpo.
- * El cuerpo decide si desplaza (Column con scroll o LazyColumn).
+ * Pantalla estándar: fondo de marca (también detrás de las barras del sistema), entrada animada,
+ * cabecera fija y cuerpo dentro del área segura. El cuerpo decide si desplaza (Column con scroll o
+ * LazyColumn). El Atrás del sistema usa [systemBack], que por defecto es [onBack].
  */
 @Composable
 fun GowaykiScreen(
@@ -147,11 +151,18 @@ fun GowaykiScreen(
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
     action: (@Composable () -> Unit)? = null,
+    systemBack: (() -> Unit)? = onBack,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    if (systemBack != null) SystemBackHandler(onBack = systemBack)
     AtmosphereBackground(modifier) {
         EnterContent(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().padding(horizontal = GowaykiSpace.md, vertical = GowaykiSpace.sm)) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(horizontal = GowaykiSpace.md, vertical = GowaykiSpace.sm),
+            ) {
                 ScreenHeader(title, onBack = onBack, action = action)
                 content()
             }
@@ -544,7 +555,10 @@ fun BottomNavBar(
         shape = RoundedCornerShape(topStart = GowaykiRadius.lg, topEnd = GowaykiRadius.lg),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = GowaykiSpace.xs, vertical = GowaykiSpace.sm),
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = GowaykiSpace.xs, vertical = GowaykiSpace.sm),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {

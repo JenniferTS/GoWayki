@@ -94,7 +94,7 @@ Si falta la tercera, el login con Google funciona en todo menos en la app bajada
 1. Subir `versionCode` / `versionName` en `androidApp/build.gradle.kts`.
 2. `./gradlew :androidApp:bundleRelease` → `androidApp/build/outputs/bundle/release/androidApp-release.aab`.
    - AAB y no APK: Play entrega a cada teléfono solo su ABI, y `libmaplibre.so` pesa ~11 MB por ABI (×4 en el APK universal).
-3. Antes de subir: requisitos de Play que hoy **no se cumplen** → `targetSdk 36` y 16 KB (ver `docs/PLAN_UPGRADE_STACK.md`, etapas 1-2).
+3. Requisitos de Play: `targetSdk 36` y librerías nativas alineadas a 16 KB **se cumplen** desde 2026-11-24 (`docs/PLAN_UPGRADE_STACK.md`, etapas 1-2). Para comprobarlo en un APK: `zipalign -c -P 16 -v 4 <apk>` (build-tools 36) y que el emulador con páginas de 16 KB no muestre el diálogo «Android App Compatibility» en una instalación limpia.
 4. Play Console: Play App Signing activado (default), subir a prueba interna primero, registrar el SHA-1 de app signing en Firebase, probar login desde la app bajada de Play.
 
 ## CI
