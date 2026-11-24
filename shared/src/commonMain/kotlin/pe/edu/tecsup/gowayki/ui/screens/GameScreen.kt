@@ -195,16 +195,8 @@ fun GameScreen(session: AppSession) {
                 RunPhase.Idle, RunPhase.Ended -> GlassPanel(Modifier.fillMaxWidth()) {
                     val over = phase == RunPhase.Ended
                     Text(if (over) s.gameOverTitle else s.gameReadyTitle, style = MaterialTheme.typography.h6)
-                    Spacer(Modifier.height(GowaykiSpace.xs))
-                    if (over) {
-                        Text(
-                            "${s.gameScore}: $score",
-                            style = MaterialTheme.typography.h4,
-                            color = colors.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(s.format(s.gameBest, best), style = MaterialTheme.typography.subtitle1)
-                    } else {
+                    if (!over) {
+                        Spacer(Modifier.height(GowaykiSpace.xs))
                         Text(s.gameHelp, style = MaterialTheme.typography.body2)
                     }
                     Spacer(Modifier.height(GowaykiSpace.smd))

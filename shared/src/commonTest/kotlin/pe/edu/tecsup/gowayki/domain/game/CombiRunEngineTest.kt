@@ -133,9 +133,26 @@ class CombiRunEngineTest {
         e.run(45f)
         assertTrue(e.speed() > v0 && e.speed() < e.config.maxSpeed)
         assertTrue(e.spawnInterval() < s0)
+        e.run(45f)
+        assertEquals(e.config.maxSpeed, e.speed(), 5f)
+        assertEquals(e.config.minSpawnSeconds, e.spawnInterval(), 0.01f)
+    }
+
+    @Test
+    fun keepsSpeedingUpAfterTheRampUntilTheSafeCap() {
+        val e = engine(CombiRunEngine.Config(playerX = -100_000f))
+        e.start()
+        e.run(120f)
+        val v120 = e.speed()
+        assertTrue(v120 > e.config.maxSpeed, "Pasada la rampa la velocidad debe seguir subiendo.")
+        assertTrue(e.spawnInterval() < e.config.minSpawnSeconds)
         e.run(60f)
-        assertEquals(e.config.maxSpeed, e.speed())
-        assertEquals(e.config.minSpawnSeconds, e.spawnInterval(), 0.0001f)
+        assertTrue(e.speed() > v120)
+        e.run(600f)
+        assertEquals(e.config.absoluteMaxSpeed, e.speed())
+        assertEquals(e.config.spawnFloorSeconds, e.spawnInterval())
+        val window = 2 * (e.config.playerHalfLength + e.config.potholeHalfLength - e.config.hitMargin)
+        assertTrue(e.config.absoluteMaxSpeed * e.config.maxStepSeconds < window, "Un bache no puede saltar la ventana de choque.")
     }
 
     @Test
