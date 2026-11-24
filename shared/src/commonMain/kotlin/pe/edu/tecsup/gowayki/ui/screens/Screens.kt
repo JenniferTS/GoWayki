@@ -608,7 +608,7 @@ fun ProfileScreen(session: AppSession) {
         ) {
             GlassPanel(Modifier.fillMaxWidth()) {
                 BrandMark(
-                    subtitle = if (isGuest) s.guest else s.format(s.signedInAs, user?.displayName ?: s.guest),
+                    subtitle = if (isGuest) s.guest else s.format(s.signedInAs, user.displayName ?: s.guest),
                 )
             }
             Spacer(Modifier.height(GowaykiSpace.xs))
