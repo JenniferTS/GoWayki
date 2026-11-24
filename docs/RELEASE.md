@@ -84,7 +84,7 @@ Google Sign-In valida el SHA-1 del APK que corre en el teléfono. En `gowayki-la
 | Firma | Para qué | Estado |
 |---|---|---|
 | debug de cada PC de desarrollo | builds locales | esta PC: `1F:A2:52:…:AC:07` ✅ registrado |
-| upload key | APK/AAB release instalado a mano | `4C:2B:52:D0:A6:CD:68:B4:74:11:51:DA:33:8B:31:0A:5A:F2:EB:26` ❌ **falta registrar** |
+| upload key | APK/AAB release instalado a mano | `4C:2B:52:D0:A6:CD:68:B4:74:11:51:DA:33:8B:31:0A:5A:F2:EB:26` ✅ registrado (login de release verificado) |
 | **app signing key de Play** | builds que instala Play Store | ❌ se obtiene en Play Console → Integridad de la app → Firma de apps, **después** de la primera subida |
 
 Si falta la tercera, el login con Google funciona en todo menos en la app bajada de Play (`DEVELOPER_ERROR` / "Revisa SHA-1"). Error clásico.
