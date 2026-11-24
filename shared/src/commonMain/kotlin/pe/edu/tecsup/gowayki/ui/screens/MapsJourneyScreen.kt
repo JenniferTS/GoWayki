@@ -19,9 +19,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -57,6 +61,7 @@ import pe.edu.tecsup.gowayki.domain.planner.Itinerary
 import pe.edu.tecsup.gowayki.domain.planner.TransitLeg
 import pe.edu.tecsup.gowayki.domain.planner.WalkLeg
 import pe.edu.tecsup.gowayki.platform.HapticKind
+import pe.edu.tecsup.gowayki.platform.SystemBackHandler
 import pe.edu.tecsup.gowayki.platform.platformHaptic
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
@@ -116,7 +121,10 @@ fun MapsJourneyScreen(session: AppSession) {
 
     val selected = session.selectedItineraryIndex.coerceIn(0, (list.size - 1).coerceAtLeast(0))
     val trip = list.getOrNull(selected)
-    val padBottom = sheetSnap.mapPaddingDp()
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val padBottom = sheetSnap.mapPaddingDp() + navBottom.value.toInt()
+
+    SystemBackHandler { session.go(Screen.Search) }
 
     Box(Modifier.fillMaxSize().background(colors.background)) {
         JourneyMap(session, trip, padBottom)
@@ -133,6 +141,7 @@ fun MapsJourneyScreen(session: AppSession) {
             val shape = RoundedCornerShape(GowaykiRadius.lg)
             Surface(
                 modifier = Modifier
+                    .statusBarsPadding()
                     .padding(top = GowaykiSpace.md, start = GowaykiSpace.md, end = GowaykiSpace.md)
                     .fillMaxWidth()
                     .shadow(GowaykiElevation.panel, shape, spotColor = colors.shadow)
@@ -182,6 +191,7 @@ fun MapsJourneyScreen(session: AppSession) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
+                    .statusBarsPadding()
                     .padding(top = 112.dp, start = GowaykiSpace.lg, end = GowaykiSpace.lg),
                 shape = RoundedCornerShape(GowaykiRadius.sm),
                 color = colors.surfaceElevated,

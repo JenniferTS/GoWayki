@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.compose")
     id("com.android.application")
     id("org.jetbrains.compose")
     id("com.google.gms.google-services")
@@ -9,17 +10,18 @@ plugins {
 }
 
 kotlin {
+    jvmToolchain(17)
     androidTarget()
     sourceSets {
-        val androidMain by getting {
+        androidMain {
             dependencies {
                 implementation(project(":shared"))
-                implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+                implementation(project.dependencies.platform("com.google.firebase:firebase-bom:35.2.0"))
                 implementation("com.google.firebase:firebase-auth")
                 implementation("com.google.firebase:firebase-firestore")
-                implementation("com.google.android.gms:play-services-location:21.3.0")
-                implementation("org.maplibre.gl:android-sdk:11.5.2")
-                implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+                implementation("com.google.android.gms:play-services-location:21.4.0")
+                implementation("org.maplibre.gl:android-sdk-opengl:13.7.1")
+                implementation("androidx.profileinstaller:profileinstaller:1.4.1")
             }
         }
     }
@@ -97,9 +99,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlin {
-        jvmToolchain(17)
     }
 }
 
