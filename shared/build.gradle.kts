@@ -43,7 +43,9 @@ kotlin {
                 implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
                 implementation("com.google.firebase:firebase-auth")
                 implementation("com.google.firebase:firebase-firestore")
-                implementation("com.google.android.gms:play-services-auth:21.2.0")
+                implementation("androidx.credentials:credentials:1.3.0")
+                implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+                implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
                 implementation("com.google.android.gms:play-services-location:21.3.0")
                 implementation("org.maplibre.gl:android-sdk:11.5.2")
             }
@@ -65,7 +67,8 @@ android {
     namespace = "com.myapplication.common"
 
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    sourceSets["main"].res.srcDirs("src/androidMain/res")
+    // Recursos Android = composeResources (logo, fuentes, ilustraciones de micros): una sola copia.
+    sourceSets["main"].res.srcDirs("src/commonMain/composeResources")
     sourceSets["main"].resources.srcDirs("src/commonMain/resources")
 
     defaultConfig {

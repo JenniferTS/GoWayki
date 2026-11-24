@@ -1,11 +1,15 @@
 package pe.edu.tecsup.gowayki.ui
 
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pe.edu.tecsup.gowayki.domain.auth.SignedInUser
@@ -56,6 +60,8 @@ import pe.edu.tecsup.gowayki.platform.AlarmMode
 import pe.edu.tecsup.gowayki.platform.PlatformLocation
 import pe.edu.tecsup.gowayki.platform.platformClearTripNotifications
 import pe.edu.tecsup.gowayki.platform.platformFetchCurrentLocation
+import pe.edu.tecsup.gowayki.platform.platformIoDispatcher
+import pe.edu.tecsup.gowayki.platform.platformIsDebugBuild
 import pe.edu.tecsup.gowayki.platform.platformIsLocationEnabled
 import pe.edu.tecsup.gowayki.platform.platformLastLocation
 import pe.edu.tecsup.gowayki.platform.platformRanking
@@ -104,17 +110,22 @@ data class ActiveTripState(
         get() = status == ActiveTripStatus.Starting || status == ActiveTripStatus.Active
 }
 
+/** Todo su estado público vive en `mutableStateOf`, así que Compose puede saltar recomposiciones. */
+@Stable
 class AppSession(
     private val preferences: PreferencesRepository = InMemoryPreferencesRepository(),
     private val reports: ReportsRepository = InMemoryReportsRepository(),
     private val placeSearch: PlaceSearchRepository? = null,
     private val networkProvider: (() -> PlannerNetwork?)? = null,
     private val cityPackProvider: (() -> CityPackRepository?)? = null,
-    deviceLanguage: String? = "es",
+    private val deviceLanguage: String? = "es",
     startAsGuest: Boolean = true,
     private val initialSignedIn: SignedInUser? = null,
 ) {
     var locale by mutableStateOf(preferences.locale(deviceLanguage))
+        private set
+    /** Idioma elegido en la app; null = seguir al dispositivo. */
+    var localeChoice by mutableStateOf(AppLocale.parse(preferences.readLocaleCode()))
         private set
     var reduceMotion by mutableStateOf(false)
     var alarmMode by mutableStateOf(
@@ -176,19 +187,36 @@ class AppSession(
     /** Sube al tocar “mi ubicación” para recentrar el mapa. */
     var locationFollowEpoch by mutableStateOf(0L)
     var authBusy by mutableStateOf(false)
+    var reportSending by mutableStateOf(false)
     var authError by mutableStateOf<String?>(null)
 
     private var tracker: TripTracker? = null
     private var stopLocationWatch: (() -> Unit)? = null
     private var stopUserLocationWatchHandle: (() -> Unit)? = null
     private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var packJob: Job? = null
+    private var reportsJob: Job? = null
+    private var rankingJob: Job? = null
+    private var flushJob: Job? = null
+    private var searchJob: Job? = null
+
+    /** Red/SQLite bloqueantes fuera del hilo de UI; el resultado vuelve al hilo principal. */
+    private suspend fun <T> io(block: () -> T): T = withContext(platformIoDispatcher) { block() }
 
     val strings: Strings get() = StringCatalog.forLocale(locale)
+    val isDebugBuild: Boolean by lazy { platformIsDebugBuild() }
+
+    init {
+        StringCatalog.current = strings
+    }
     val baseFare: Money get() = Money.BASE
 
+    /**
+     * Arranque: decide la pantalla con datos locales y navega de inmediato.
+     * Paquete de ciudad, reportes, ranking y sincronización llegan después en segundo plano.
+     */
     fun bootstrap() {
         packReady = networkProvider?.invoke() != null
-        refreshPackMapData()
         pendingScoreCount = preferences.readPendingScores().size
         val restored = initialSignedIn?.takeIf { !it.isAnonymous }
         if (restored != null) {
@@ -197,9 +225,9 @@ class AppSession(
             val onboarding = preferences.readOnboarding()
             screen = if (onboarding == null) Screen.Onboarding else Screen.Home
             maybeStartTutorial()
+            refreshNearbyReports()
         }
-        refreshNearbyReports()
-        flushPendingScores()
+        refreshPackMapData()
         warmLocation(setAsOrigin = false)
     }
 
@@ -214,20 +242,41 @@ class AppSession(
         )
     }
 
+    /**
+     * Lee líneas y paraderos del paquete una sola vez por sesión, en segundo plano.
+     * Si el paquete aún se está copiando/abriendo, espera a que esté listo.
+     */
     fun refreshPackMapData() {
-        val pack = cityPackProvider?.invoke() ?: return
-        runCatching {
-            transitLines = pack.lines().sortedBy { it.shortName }
-            mapStopPoints = pack.mapStops().take(80).map {
-                GeoPoint(it.stop.latitude, it.stop.longitude)
+        val provider = cityPackProvider ?: return
+        if (transitLines.isNotEmpty() || packJob?.isActive == true) return
+        packJob = sessionScope.launch {
+            var pack = provider()
+            var waitedMs = 0
+            while (pack == null && waitedMs < 60_000) {
+                delay(150)
+                waitedMs += 150
+                pack = provider()
             }
+            val ready = pack ?: return@launch
+            val loaded = io {
+                runCatching {
+                    ready.lines().sortedBy { it.shortName } to ready.mapStops().take(80).map {
+                        GeoPoint(it.stop.latitude, it.stop.longitude)
+                    }
+                }.getOrNull()
+            } ?: return@launch
+            transitLines = loaded.first
+            mapStopPoints = loaded.second
             packReady = true
         }
     }
 
-    fun updateLocale(value: AppLocale) {
-        locale = value
-        preferences.saveLocaleCode(value.code)
+    /** [value] null vuelve al idioma del dispositivo. La elección se guarda. */
+    fun updateLocale(value: AppLocale?) {
+        localeChoice = value
+        locale = value ?: AppLocale.resolve(null, deviceLanguage)
+        preferences.saveLocaleCode(value?.code)
+        StringCatalog.current = strings
     }
 
     fun finishOnboarding(skipped: Boolean) {
@@ -235,7 +284,7 @@ class AppSession(
         preferences.saveOnboarding(status)
         val uid = user?.takeIf { !it.isGuest }?.uid
         if (uid != null) {
-            runCatching { platformUserStateSync().pushOnboarding(uid, status) }
+            sessionScope.launch { io { runCatching { platformUserStateSync().pushOnboarding(uid, status) } } }
         }
         screen = Screen.Home
         maybeStartTutorial()
@@ -246,17 +295,16 @@ class AppSession(
         if (to == Screen.Home) {
             refreshNearbyReports()
             refreshPackMapData()
-            warmLocation(setAsOrigin = false)
         }
         if (to == Screen.Search) {
-            warmLocation(setAsOrigin = origin == null)
+            warmLocation(setAsOrigin = origin == null, onlyIfOriginEmpty = true)
         }
         if (to == Screen.Ranking) loadRanking()
         if (to == Screen.Lines) refreshPackMapData()
     }
 
     /** Pide permiso + fix fresco (Fused). Opcionalmente rellena origen. */
-    fun warmLocation(setAsOrigin: Boolean = false) {
+    fun warmLocation(setAsOrigin: Boolean = false, onlyIfOriginEmpty: Boolean = false) {
         locationMessage = null
         platformRequestLocationPermission { granted ->
             if (!granted) {
@@ -274,12 +322,12 @@ class AppSession(
                 if (fix == null) {
                     val cached = platformLastLocation()
                     if (cached != null) {
-                        applyLocationFix(cached, setAsOrigin)
+                        applyLocationFix(cached, setAsOrigin && (!onlyIfOriginEmpty || origin == null))
                     } else {
                         locationMessage = strings.locationUnavailable
                     }
                 } else {
-                    applyLocationFix(fix, setAsOrigin)
+                    applyLocationFix(fix, setAsOrigin && (!onlyIfOriginEmpty || origin == null))
                 }
             }
         }
@@ -380,26 +428,35 @@ class AppSession(
     fun confirmNearbyReport(reportId: String) {
         val current = user
         if (current == null || current.isGuest) {
-            reportMessage = strings.signIn
+            reportMessage = strings.reportNeedsAccount
             screen = Screen.Auth
             return
         }
-        runCatching {
-            val ok = platformRemoteReports()?.confirm(reportId, current.uid) ?: false
-            reportMessage = if (ok) "ok" else strings.alreadyConfirmed
-            refreshNearbyReports()
-        }.onFailure {
-            reportMessage = it.message ?: strings.errorGeneric
+        sessionScope.launch {
+            val result = io { runCatching { platformRemoteReports()?.confirm(reportId, current.uid) ?: false } }
+            result.onSuccess { ok ->
+                reportMessage = if (ok) REPORT_CONFIRMED else strings.alreadyConfirmed
+                refreshNearbyReports(force = true)
+            }.onFailure {
+                reportMessage = strings.errorGeneric
+            }
         }
     }
 
+    /** Búsqueda con pausa corta entre teclas y fuera del hilo de UI; un error no tumba la app. */
     fun searchPlaces(query: String) {
         val q = query.trim()
-        if (q.length < 2 || placeSearch == null) {
+        searchJob?.cancel()
+        val search = placeSearch
+        if (q.length < 2 || search == null) {
             searchHits = emptyList()
             return
         }
-        searchHits = placeSearch.search(q)
+        searchJob = sessionScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            val hits = io { runCatching { search.search(q) }.getOrDefault(emptyList()) }
+            searchHits = hits
+        }
     }
 
     fun selectPlace(hit: PlaceResult) {
@@ -413,6 +470,7 @@ class AppSession(
             originLabel = hit.name
             originQuery = hit.name
         }
+        searchJob?.cancel()
         searchHits = emptyList()
     }
 
@@ -465,8 +523,8 @@ class AppSession(
                     planError = strings.emptyRoutes
                 }
                 screen = Screen.Results
-            }.onFailure { t ->
-                planError = t.message ?: strings.errorGeneric
+            }.onFailure {
+                planError = strings.errorGeneric
             }
         }
     }
@@ -510,62 +568,80 @@ class AppSession(
     fun submitReport() {
         val current = user
         if (current == null || current.isGuest) {
-            reportMessage = strings.signIn
+            reportMessage = strings.reportNeedsAccount
             screen = Screen.Auth
             return
         }
-        try {
-            val remote = platformRemoteReports()
+        if (reportSending) return
+        val remote = platformRemoteReports()
+        val draft = try {
             val id = remote?.newId() ?: reports.newId()
-            val draft = ReportDraft(
+            ReportDraft(
                 id = id,
                 kind = reportKind,
                 description = reportDescription.ifBlank { "${reportKind.apiValue} report" },
                 latitude = reportLat,
                 longitude = reportLng,
-            )
-            reports.saveDraft(draft, current.uid)
-            reports.markPending(id)
-            if (remote != null) {
-                remote.createOrReuse(draft, current.uid)
-                reports.markPublished(id, UtcDateTime.now())
-            } else {
-                reports.markPublished(id, UtcDateTime.now())
+            ).also {
+                reports.saveDraft(it, current.uid)
+                reports.markPending(id)
             }
-            myReports = reports.mine(current.uid)
-            reportMessage = "ok"
-            reportDescription = ""
-            refreshNearbyReports()
-            screen = Screen.Home
         } catch (t: Throwable) {
-            reportMessage = t.message ?: strings.errorGeneric
+            reportMessage = strings.reportValidation
+            return
+        }
+        reportSending = true
+        reportMessage = null
+        sessionScope.launch {
+            val sent = io { runCatching { remote?.createOrReuse(draft, current.uid) } }
+            reportSending = false
+            sent.onSuccess {
+                reports.markPublished(draft.id, UtcDateTime.now())
+                myReports = reports.mine(current.uid)
+                reportMessage = REPORT_OK
+                reportDescription = ""
+                refreshNearbyReports(force = true)
+            }.onFailure {
+                reportMessage = strings.reportSendError
+            }
         }
     }
 
     fun withdrawReport(id: String) {
         val uid = user?.uid
-        runCatching {
-            if (uid != null && !user!!.isGuest) {
-                platformRemoteReports()?.deleteMine(id, uid)
-            }
+        val remoteUid = uid?.takeIf { user?.isGuest == false }
+        sessionScope.launch {
+            if (remoteUid != null) io { runCatching { platformRemoteReports()?.deleteMine(id, remoteUid) } }
+            reports.delete(id)
+            myReports = reports.mine(uid)
+            refreshNearbyReports(force = true)
         }
-        reports.delete(id)
-        myReports = reports.mine(uid)
-        refreshNearbyReports()
     }
 
-    fun refreshNearbyReports() {
-        runCatching {
+    fun refreshNearbyReports(force: Boolean = false) {
+        val client = platformRemoteReports() ?: return
+        if (reportsJob?.isActive == true) {
+            if (!force) return
+            reportsJob?.cancel()
+        }
+        val loc = platformLastLocation()
+        val centerLat = loc?.latitude ?: reportLat
+        val centerLng = loc?.longitude ?: reportLng
+        reportsJob = sessionScope.launch {
             val since = UtcDateTime.now().let {
                 UtcDateTime(it.epochMicros - 72L * 3_600_000_000L)
             }
-            val loc = platformLastLocation()
-            nearbyReports = platformRemoteReports()?.activeAround(
-                since = since,
-                centerLat = loc?.latitude ?: reportLat,
-                centerLng = loc?.longitude ?: reportLng,
-                radiusKm = 8.0,
-            )?.items.orEmpty()
+            val feed = io {
+                runCatching {
+                    client.activeAround(
+                        since = since,
+                        centerLat = centerLat,
+                        centerLng = centerLng,
+                        radiusKm = 8.0,
+                    )
+                }.getOrNull()
+            }
+            if (feed != null) nearbyReports = feed.items
         }
     }
 
@@ -578,27 +654,53 @@ class AppSession(
             isNewRegistration = isNew,
             isGuest = false,
         )
-        val sync = platformUserStateSync()
-        runCatching { sync.ensureUser(uid) }
-        val remoteTutorial = runCatching { sync.pullTutorial(uid) }.getOrNull()
         tutorial = if (isNew) {
             TutorialMigrationPolicy.forNewGoogleRegistration()
         } else {
-            TutorialMigrationPolicy.resolve(false, remoteTutorial ?: preferences.readTutorial())
+            TutorialMigrationPolicy.resolve(false, preferences.readTutorial())
         }
         preferences.saveTutorial(tutorial)
-        runCatching { sync.pushTutorial(uid, tutorial) }
-        val remoteOnboarding = runCatching { sync.pullOnboarding(uid) }.getOrNull()
-        if (remoteOnboarding != null && preferences.readOnboarding() == null) {
-            preferences.saveOnboarding(remoteOnboarding)
-        }
-        if (preferences.readOnboarding() == null && remoteOnboarding == null) {
-            preferences.saveOnboarding(OnboardingStatus.Completed)
-        }
+        val hadLocalOnboarding = preferences.readOnboarding() != null
+        if (!hadLocalOnboarding) preferences.saveOnboarding(OnboardingStatus.Completed)
         screen = Screen.Home
         maybeStartTutorial()
-        flushPendingScores()
-        loadRanking()
+        refreshNearbyReports()
+        syncSignedInUser(uid, isNew, hadLocalOnboarding)
+    }
+
+    /**
+     * Sincronización con Firestore tras iniciar sesión, sin bloquear la navegación:
+     * alta del documento y lectura de tutorial/onboarding en paralelo; luego
+     * se publica el tutorial, se vacía la cola de puntajes y se carga el ranking.
+     */
+    private fun syncSignedInUser(uid: String, isNew: Boolean, hadLocalOnboarding: Boolean) {
+        val sync = platformUserStateSync()
+        sessionScope.launch {
+            val (remoteTutorial, remoteOnboarding) = withContext(platformIoDispatcher) {
+                val ensured = async { runCatching { sync.ensureUser(uid) } }
+                val pulledTutorial = async { runCatching { sync.pullTutorial(uid) }.getOrNull() }
+                val pulledOnboarding = async { runCatching { sync.pullOnboarding(uid) }.getOrNull() }
+                ensured.await()
+                pulledTutorial.await() to pulledOnboarding.await()
+            }
+            if (user?.uid != uid) return@launch
+            if (!isNew && remoteTutorial != null && remoteTutorial != tutorial) {
+                tutorial = TutorialMigrationPolicy.resolve(false, remoteTutorial)
+                preferences.saveTutorial(tutorial)
+                if (tutorial.status == TutorialStatus.Pending || tutorial.status == TutorialStatus.Started) {
+                    maybeStartTutorial()
+                } else {
+                    showTutorialOverlay = false
+                }
+            }
+            if (remoteOnboarding != null && !hadLocalOnboarding) {
+                preferences.saveOnboarding(remoteOnboarding)
+            }
+            val progress = tutorial
+            io { runCatching { sync.pushTutorial(uid, progress) } }
+            flushPendingScores()
+            loadRanking()
+        }
     }
 
     fun beginGoogleSignIn() {
@@ -610,12 +712,17 @@ class AppSession(
             },
             onError = { msg ->
                 authBusy = false
-                authError = msg
+                authError = when {
+                    msg.isBlank() -> null
+                    isDebugBuild -> "${strings.authGoogleError} ($msg)"
+                    else -> strings.authGoogleError
+                }
             },
         )
     }
 
     fun signInWithGoogleDemo(isNew: Boolean) {
+        if (!isDebugBuild) return
         applyGoogleUser(
             uid = if (isNew) "new-google-user" else "existing-google-user",
             displayName = "Sharon",
@@ -624,6 +731,7 @@ class AppSession(
     }
 
     fun signOutToGuest() {
+        pe.edu.tecsup.gowayki.platform.signOutPlatformGoogle()
         user = AuthUser(uid = "guest", displayName = null, isGuest = true)
         showTutorialOverlay = false
         authError = null
@@ -673,7 +781,8 @@ class AppSession(
     private fun persistTutorial() {
         preferences.saveTutorial(tutorial)
         val uid = user?.takeIf { !it.isGuest }?.uid ?: return
-        runCatching { platformUserStateSync().pushTutorial(uid, tutorial) }
+        val progress = tutorial
+        sessionScope.launch { io { runCatching { platformUserStateSync().pushTutorial(uid, progress) } } }
     }
 
     fun formatFare(money: Money): String {
@@ -760,17 +869,18 @@ class AppSession(
     }
 
     fun loadRanking() {
+        if (rankingJob?.isActive == true) return
+        val client = platformRanking()
+        val uid = user?.takeIf { !it.isGuest }?.uid
         rankingLoading = true
         rankingMessage = null
-        runCatching {
+        rankingJob = sessionScope.launch {
             val week = rankingWeek()
-            val uid = user?.takeIf { !it.isGuest }?.uid
-            ranking = platformRanking()?.load(week, uid)
-                ?: WeeklyRanking(top = emptyList())
-        }.onFailure {
-            rankingMessage = it.message ?: strings.errorGeneric
+            val loaded = io { runCatching { client?.load(week, uid) ?: WeeklyRanking(top = emptyList()) } }
+            loaded.onSuccess { ranking = it }
+                .onFailure { rankingMessage = strings.rankingUnavailable }
+            rankingLoading = false
         }
-        rankingLoading = false
     }
 
     fun submitGameScore(score: Int, durationMs: Int) {
@@ -787,32 +897,38 @@ class AppSession(
             rankingMessage = strings.scoreSavedOffline
             return
         }
-        val published = publishPending(pending, current)
-        if (published) {
-            rankingMessage = null
-            loadRanking()
-            screen = Screen.Ranking
-        } else {
-            rankingMessage = strings.scoreSavedOffline
+        rankingMessage = null
+        sessionScope.launch {
+            val published = publishPending(pending, current)
+            if (published) {
+                rankingMessage = null
+                loadRanking()
+                screen = Screen.Ranking
+            } else {
+                rankingMessage = strings.scoreSavedOffline
+            }
         }
     }
 
     fun flushPendingScores() {
         val current = user?.takeIf { !it.isGuest } ?: return
+        if (flushJob?.isActive == true) return
         val lines = preferences.readPendingScores().toMutableList()
         if (lines.isEmpty()) return
-        val remaining = mutableListOf<String>()
-        for (line in lines) {
-            val parts = line.split('|')
-            if (parts.size != 3) continue
-            val pending = runCatching {
-                PendingScore(parts[0], parts[1].toInt(), parts[2].toInt())
-            }.getOrNull() ?: continue
-            if (!publishPending(pending, current)) remaining.add(line)
+        flushJob = sessionScope.launch {
+            val remaining = mutableListOf<String>()
+            for (line in lines) {
+                val parts = line.split('|')
+                if (parts.size != 3) continue
+                val pending = runCatching {
+                    PendingScore(parts[0], parts[1].toInt(), parts[2].toInt())
+                }.getOrNull() ?: continue
+                if (!publishPending(pending, current)) remaining.add(line)
+            }
+            preferences.savePendingScores(remaining)
+            pendingScoreCount = remaining.size
+            if (remaining.isEmpty()) loadRanking()
         }
-        preferences.savePendingScores(remaining)
-        pendingScoreCount = remaining.size
-        if (remaining.isEmpty()) loadRanking()
     }
 
     private fun enqueuePendingScore(pending: PendingScore) {
@@ -833,16 +949,16 @@ class AppSession(
         pendingScoreCount = lines.size
     }
 
-    private fun publishPending(pending: PendingScore, current: AuthUser): Boolean {
+    private suspend fun publishPending(pending: PendingScore, current: AuthUser): Boolean {
         val client = platformRanking() ?: return false
-        return runCatching {
-            val name = current.displayName?.ifBlank { null } ?: "Wayki"
-            client.publish(current.uid, name, pending)
+        val name = current.displayName?.ifBlank { null } ?: "Wayki"
+        val ok = io { runCatching { client.publish(current.uid, name, pending) }.isSuccess }
+        if (ok) {
             val left = preferences.readPendingScores().filterNot { it.startsWith("${pending.week}|") }
             preferences.savePendingScores(left)
             pendingScoreCount = left.size
-            true
-        }.getOrDefault(false)
+        }
+        return ok
     }
 
     private fun rememberRecentTrip() {
@@ -903,10 +1019,10 @@ class AppSession(
                     color = "#B9532F",
                     patternId = "demo-p",
                     direction = "outbound",
-                    headsign = destinationLabel.ifBlank { "Destino" },
+                    headsign = destinationLabel.ifBlank { strings.searchDestination },
                     boardingStop = CityStop(
                         id = "s1",
-                        name = originLabel.ifBlank { "Origen" },
+                        name = originLabel.ifBlank { strings.searchOrigin },
                         latitude = from.latitude,
                         longitude = from.longitude,
                         sourceKind = "demo",
@@ -916,7 +1032,7 @@ class AppSession(
                     ),
                     alightingStop = CityStop(
                         id = "s2",
-                        name = destinationLabel.ifBlank { "Destino" },
+                        name = destinationLabel.ifBlank { strings.searchDestination },
                         latitude = to.latitude,
                         longitude = to.longitude,
                         sourceKind = "demo",
@@ -947,5 +1063,12 @@ class AppSession(
             referenceTime = now,
             accessRadiusMeters = 800.0,
         )
+    }
+
+    companion object {
+        /** Marcadores de [reportMessage] que la UI traduce a confirmaciones (no son texto visible). */
+        const val REPORT_OK = "report-ok"
+        const val REPORT_CONFIRMED = "report-confirmed"
+        private const val SEARCH_DEBOUNCE_MS = 180L
     }
 }

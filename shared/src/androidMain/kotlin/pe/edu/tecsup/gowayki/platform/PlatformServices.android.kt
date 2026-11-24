@@ -107,7 +107,7 @@ actual fun platformTripAlert(title: String, body: String, mode: AlarmMode) {
     val channelId = "gowayki_trip"
     if (Build.VERSION.SDK_INT >= 26) {
         nm.createNotificationChannel(
-            NotificationChannel(channelId, "Viaje GoWayki", NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(channelId, pe.edu.tecsup.gowayki.i18n.StringCatalog.current.tripChannelName, NotificationManager.IMPORTANCE_HIGH),
         )
     }
     val notification = NotificationCompat.Builder(act, channelId)
@@ -269,4 +269,11 @@ actual fun platformHaptic(kind: HapticKind) {
             vibrator.vibrate(if (kind == HapticKind.Success) 28 else 12)
         }
     }
+}
+
+actual val platformIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO
+
+actual fun platformIsDebugBuild(): Boolean {
+    val act = AndroidPlatformHost.activity ?: return false
+    return (act.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 }

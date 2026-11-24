@@ -54,7 +54,6 @@ fun itinerarySegments(trip: Itinerary?): List<RouteSegment> {
                     points = downsample(base, maxPoints = 64),
                     kind = RouteKind.Walk,
                     colorHex = "#5C6B73",
-                    label = "Caminar",
                 )
             }
             is TransitLeg -> RouteSegment(
@@ -72,7 +71,7 @@ fun itineraryStops(trip: Itinerary?): List<GeoPoint> {
     return trip.legs.filterIsInstance<TransitLeg>().flatMap { leg ->
         (listOf(leg.boardingStop) + leg.intermediateStops.take(16) + listOf(leg.alightingStop))
             .map { GeoPoint(it.latitude, it.longitude) }
-    }.distinctBy { "${"%.5f".format(it.latitude)},${"%.5f".format(it.longitude)}" }
+    }.distinctBy { kotlin.math.round(it.latitude * 1e5).toLong() to kotlin.math.round(it.longitude * 1e5).toLong() }
         .take(80)
 }
 

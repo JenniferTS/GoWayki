@@ -22,7 +22,7 @@ import pe.edu.tecsup.gowayki.domain.repositories.PlaceSearchRepository
 
 /**
  * Consultas de solo lectura sobre una conexión ya abierta.
- * La búsqueda de lugares usa el FTS5 `places_fts` del paquete.
+ * La búsqueda de lugares usa el FTS5 `places_fts` del paquete (o LIKE si el SQLite no trae FTS5).
  */
 class SqliteCityPackRepository(
     private val connection: DbConnection,
@@ -30,6 +30,7 @@ class SqliteCityPackRepository(
 ) : CityPackRepository, PlaceSearchRepository {
     private var closed = false
     private var lineCache: List<TransitLine>? = null
+    private var ftsAvailable = true
 
     override fun lines(): List<TransitLine> {
         ensureOpen()
@@ -168,8 +169,43 @@ class SqliteCityPackRepository(
         ensureOpen()
         require(limit in 1..100) { "limit" }
         val expression = placesFtsMatchExpression(query) ?: return emptyList()
+        if (ftsAvailable) {
+            try {
+                return queryPlaces(PackSql.PLACES, listOf(expression, limit))
+            } catch (e: Exception) {
+                if (e.message?.contains("fts5", ignoreCase = true) != true) throw e
+                ftsAvailable = false
+            }
+        }
+        return searchPlacesWithLike(query, limit)
+    }
+
+    /**
+     * El SQLite del sistema de Android no siempre trae FTS5 (p. ej. Android 16):
+     * se busca con LIKE por cada palabra en nombre, alias y dirección.
+     */
+    private fun searchPlacesWithLike(query: String, limit: Int): List<CityPlace> {
+        val tokens = query.split(LIKE_TOKEN_SEPARATOR).filter { it.isNotBlank() }.take(12)
+        if (tokens.isEmpty()) return emptyList()
+        val where = tokens.joinToString(" AND ") {
+            "(name LIKE ? ESCAPE '\\' OR aliases LIKE ? ESCAPE '\\' OR address LIKE ? ESCAPE '\\')"
+        }
+        val args = ArrayList<Any?>()
+        tokens.forEach { token ->
+            val pattern = "%" + token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            repeat(3) { args.add(pattern) }
+        }
+        val first = "%" + tokens.first().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        args.add(first)
+        args.add(limit)
+        val sql = "SELECT place_id,name,category,latitude,longitude,address,coordinate_source FROM places " +
+            "WHERE $where ORDER BY CASE WHEN name LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END, length(name) LIMIT ?"
+        return queryPlaces(sql, args)
+    }
+
+    private fun queryPlaces(sql: String, args: List<Any?>): List<CityPlace> {
         val places = ArrayList<CityPlace>()
-        connection.forEachRow(PackSql.PLACES, listOf(expression, limit)) { cursor ->
+        connection.forEachRow(sql, args) { cursor ->
             places.add(
                 CityPlace(
                     id = cursor.string("place_id"),
@@ -356,3 +392,6 @@ class SqliteCityPackRepository(
             "SELECT line_id,name FROM lines WHERE name LIKE ? ESCAPE '\\' ORDER BY line_id LIMIT 20"
     }
 }
+
+private val LIKE_TOKEN_SEPARATOR = Regex("[^\\p{L}\\p{N}]+")
+

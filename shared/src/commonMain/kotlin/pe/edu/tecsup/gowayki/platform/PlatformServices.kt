@@ -48,3 +48,9 @@ expect fun platformStopTripTracking()
 enum class HapticKind { Light, Success }
 
 expect fun platformHaptic(kind: HapticKind)
+
+/** Hilo para E/S bloqueante (Firestore `Tasks.await`, SQLite, copias de assets). Nunca el hilo de UI. */
+expect val platformIoDispatcher: kotlinx.coroutines.CoroutineDispatcher
+
+/** Build de depuración (muestra atajos de demo que no deben llegar a producción). */
+expect fun platformIsDebugBuild(): Boolean

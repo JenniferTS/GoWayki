@@ -4,12 +4,14 @@ import GowaykiRuntime
 import MainView
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.HandlerCompat
+import androidx.lifecycle.lifecycleScope
 import android.os.Looper
 import installGowaykiRuntime
 import pe.edu.tecsup.gowayki.data.auth.AndroidFirebaseAuthRepository
+import pe.edu.tecsup.gowayki.data.auth.GoogleSignInException
+import pe.edu.tecsup.gowayki.data.map.OfflineMapInstaller
 import pe.edu.tecsup.gowayki.data.citypack.openArequipaCityPack
 import pe.edu.tecsup.gowayki.data.prefs.AndroidPreferencesRepository
 import pe.edu.tecsup.gowayki.domain.auth.SignedInUser
@@ -22,26 +24,13 @@ import pe.edu.tecsup.gowayki.platform.GoogleSignInBridge
 import pe.edu.tecsup.gowayki.platform.installAndroidPlatform
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val packRef = AtomicReference<CityPackRepository?>(null)
     private val networkRef = AtomicReference<PlannerNetwork?>(null)
     private lateinit var authRepo: AndroidFirebaseAuthRepository
     private val mainHandler = HandlerCompat.createAsync(Looper.getMainLooper())
-
-    private val googleLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode != RESULT_OK) {
-            postAuthError("Inicio de sesión cancelado.")
-            return@registerForActivityResult
-        }
-        authRepo.completeGoogleSignInAsync(
-            data = result.data,
-            onSuccess = { user -> postAuthSuccess(user) },
-            onError = { msg -> postAuthError(msg) },
-        )
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,9 +42,17 @@ class MainActivity : AppCompatActivity() {
             webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID,
         )
         GoogleSignInBridge.launch = {
-            authRepo.prepareGoogleSignIn { intent ->
-                googleLauncher.launch(intent)
+            lifecycleScope.launch {
+                runCatching { authRepo.signInWithGoogle() }
+                    .onSuccess { user -> postAuthSuccess(user) }
+                    .onFailure { e ->
+                        val cancelled = (e as? GoogleSignInException)?.cancelled == true
+                        postAuthError(if (cancelled) "" else e.message ?: e.javaClass.simpleName)
+                    }
             }
+        }
+        GoogleSignInBridge.signOut = {
+            lifecycleScope.launch { authRepo.signOut() }
         }
         GoogleSignInBridge.authRepository = authRepo
 
@@ -76,6 +73,9 @@ class MainActivity : AppCompatActivity() {
             ),
         )
 
+        thread(name = "offline-map") {
+            runCatching { OfflineMapInstaller(applicationContext).installStyle(dark = false) }
+        }
         thread(name = "city-pack") {
             runCatching {
                 val pack = openArequipaCityPack()
