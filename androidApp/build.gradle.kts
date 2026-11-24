@@ -59,6 +59,10 @@ android {
             "GOOGLE_WEB_CLIENT_ID",
             "\"959294066022-7jl40t2irpfk5p9f2nn9j5b4og4es583.apps.googleusercontent.com\"",
         )
+        // Páginas legales aún no publicadas: vacío oculta los enlaces en Ajustes > Acerca de.
+        // Se fijan con -Pgowayki.privacyUrl=https://… / -Pgowayki.termsUrl=https://…
+        buildConfigField("String", "PRIVACY_URL", "\"${findProperty("gowayki.privacyUrl") ?: ""}\"")
+        buildConfigField("String", "TERMS_URL", "\"${findProperty("gowayki.termsUrl") ?: ""}\"")
     }
     signingConfigs {
         if (releaseSigningReady) {
