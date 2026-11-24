@@ -3,13 +3,17 @@ package pe.edu.tecsup.gowayki.platform
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationCompat
@@ -23,6 +27,7 @@ import pe.edu.tecsup.gowayki.data.community.FirestoreReportsClient
 import pe.edu.tecsup.gowayki.data.game.FirestoreRankingClient
 import pe.edu.tecsup.gowayki.data.location.AndroidLocationFix
 import pe.edu.tecsup.gowayki.data.sync.FirestoreUserStateSync
+import pe.edu.tecsup.gowayki.domain.account.AccountDeletionRepository
 import pe.edu.tecsup.gowayki.domain.community.RemoteReportsClient
 import pe.edu.tecsup.gowayki.domain.game.RankingClient
 import pe.edu.tecsup.gowayki.domain.planner.GeoPoint
@@ -36,7 +41,9 @@ object AndroidPlatformHost {
     @Volatile var remoteReports: RemoteReportsClient? = null
     @Volatile var userSync: UserStateSync = NoUserStateSync
     @Volatile var ranking: RankingClient? = null
+    @Volatile var accountDeletion: AccountDeletionRepository? = null
     var requestLocation: ((onResult: (Boolean) -> Unit) -> Unit)? = null
+    var requestNotifications: ((onResult: (Boolean) -> Unit) -> Unit)? = null
 }
 
 actual fun platformRemoteReports(): RemoteReportsClient? = AndroidPlatformHost.remoteReports
@@ -71,6 +78,34 @@ actual fun platformRequestLocationPermission(onResult: (Boolean) -> Unit) {
     val req = AndroidPlatformHost.requestLocation
     if (req == null) onResult(false) else req(onResult)
 }
+
+actual fun platformHasLocationPermission(): Boolean {
+    val act = AndroidPlatformHost.activity ?: return false
+    return AndroidLocationFix.hasPermission(act)
+}
+
+actual fun platformRequestNotificationPermission(onResult: (Boolean) -> Unit) {
+    val req = AndroidPlatformHost.requestNotifications
+    if (req == null) onResult(false) else req(onResult)
+}
+
+actual fun platformOpenAppSettings(): Boolean {
+    val act = AndroidPlatformHost.activity ?: return false
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", act.packageName, null))
+    return runCatching { act.startActivity(intent) }.isSuccess
+}
+
+actual fun platformOpenUrl(url: String): Boolean {
+    val act = AndroidPlatformHost.activity ?: return false
+    return try {
+        act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    }
+}
+
+actual fun platformAccountDeletion(): AccountDeletionRepository? = AndroidPlatformHost.accountDeletion
 
 actual fun platformWatchUserLocation(onFix: (PlatformLocation) -> Unit): () -> Unit {
     val act = AndroidPlatformHost.activity ?: return { }
@@ -234,16 +269,28 @@ fun installAndroidPlatform(
             )
         }
     }
-    if (Build.VERSION.SDK_INT >= 33) {
-        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) !=
+    // POST_NOTIFICATIONS ya no se pide al abrir: solo al iniciar un viaje activo (alertas de bajada).
+    val notificationLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        pendingNotificationCallback?.invoke(granted)
+        pendingNotificationCallback = null
+    }
+    AndroidPlatformHost.requestNotifications = { cb ->
+        if (Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         ) {
-            activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9911)
+            cb(true)
+        } else {
+            pendingNotificationCallback = cb
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }
 
 private var pendingLocationCallback: ((Boolean) -> Unit)? = null
+private var pendingNotificationCallback: ((Boolean) -> Unit)? = null
 
 actual fun platformHaptic(kind: HapticKind) {
     val act = AndroidPlatformHost.activity ?: return

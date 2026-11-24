@@ -9,6 +9,7 @@ import androidx.core.os.HandlerCompat
 import androidx.lifecycle.lifecycleScope
 import android.os.Looper
 import installGowaykiRuntime
+import pe.edu.tecsup.gowayki.data.account.FirebaseAccountDeletionRepository
 import pe.edu.tecsup.gowayki.data.auth.AndroidFirebaseAuthRepository
 import pe.edu.tecsup.gowayki.data.auth.GoogleSignInException
 import pe.edu.tecsup.gowayki.data.map.OfflineMapInstaller
@@ -20,6 +21,8 @@ import pe.edu.tecsup.gowayki.domain.planner.PlannerNetwork
 import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
 import pe.edu.tecsup.gowayki.domain.repositories.CityPackRepository
 import pe.edu.tecsup.gowayki.domain.repositories.PlaceSearchRepository
+import pe.edu.tecsup.gowayki.domain.legal.LegalLinks
+import pe.edu.tecsup.gowayki.platform.AndroidPlatformHost
 import pe.edu.tecsup.gowayki.platform.GoogleSignInBridge
 import pe.edu.tecsup.gowayki.platform.installAndroidPlatform
 import java.util.concurrent.atomic.AtomicReference
@@ -55,6 +58,9 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch { authRepo.signOut() }
         }
         GoogleSignInBridge.authRepository = authRepo
+        AndroidPlatformHost.accountDeletion = FirebaseAccountDeletionRepository(
+            googleIdToken = { authRepo.requestGoogleIdToken() },
+        )
 
         val placeSearch = PlaceSearchRepository {
             packRef.get()?.searchPlaces(it)?.map { place -> place.toPlaceResult() } ?: emptyList()
@@ -70,6 +76,10 @@ class MainActivity : AppCompatActivity() {
                 cityPackProvider = { packRef.get() },
                 preferences = preferences,
                 initialSignedIn = restored,
+                legalLinks = LegalLinks(
+                    privacy = LegalLinks.parse(BuildConfig.PRIVACY_URL),
+                    terms = LegalLinks.parse(BuildConfig.TERMS_URL),
+                ),
             ),
         )
 

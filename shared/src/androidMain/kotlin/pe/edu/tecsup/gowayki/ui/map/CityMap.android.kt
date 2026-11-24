@@ -3,6 +3,9 @@ package pe.edu.tecsup.gowayki.ui.map
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiSpace
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -141,6 +144,14 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                         }
                     }
                 },
+            )
+            // Atribución propia en Compose (la de MapLibre es un “i” sin texto visible y su diálogo
+            // no maneja bien atribuciones sin enlace). Abajo a la izquierda: el FAB va a la derecha
+            // y en Resultados sube sobre la hoja con [MapOverlay.fitPaddingBottomDp].
+            MapAttribution(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = GowaykiSpace.xs, bottom = overlay.fitPaddingBottomDp.dp),
             )
         }
     }

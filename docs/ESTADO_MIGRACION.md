@@ -19,7 +19,7 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 | Favoritos / viajes recientes | Implementado |
 | Explorador de líneas | Implementado |
 | Viaje activo + foreground service | Implementado |
-| Ranking + cola offline de scores | Implementado |
+| Ranking + cola offline de scores (por cuenta) | Implementado |
 | Baseline Profiles | Implementado |
 | UI brand + botones pill con press/shimmer | Implementado |
 | iOS shell | Docs + stubs (Mac) |
@@ -28,6 +28,11 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 | Tema por tokens + modo oscuro (UI y mapa) | Implementado |
 | Arranque/sesión sin bloquear el hilo de UI (Firestore en segundo plano) | Implementado |
 | R8 (minify + shrinkResources) en release/benchmark | Implementado |
+| Cola de puntajes por cuenta (sin fuga entre cuentas; invitados no encolan) | Implementado |
+| Atribución OSM/OpenMapTiles en el mapa + Ajustes › Acerca de | Implementado |
+| Aviso de ubicación antes del permiso; notificaciones solo al iniciar viaje | Implementado |
+| Eliminar cuenta desde Perfil (reanudable) | Implementado |
+| Wayki Combi: 3 carriles, baches, fin al chocar | Implementado |
 
 ## Versión
 
