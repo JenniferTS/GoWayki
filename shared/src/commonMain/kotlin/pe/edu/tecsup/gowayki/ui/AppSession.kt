@@ -171,6 +171,7 @@ class AppSession(
     var searchingDestination by mutableStateOf(true)
     var planning by mutableStateOf(false)
     var planError by mutableStateOf<String?>(null)
+    var planNotice by mutableStateOf<String?>(null)
     var journey by mutableStateOf<JourneyResponse?>(null)
     var selectedItinerary by mutableStateOf<Itinerary?>(null)
     var selectedItineraryIndex by mutableStateOf(0)
@@ -626,26 +627,38 @@ class AppSession(
         if (planning) return
         planning = true
         planError = null
+        planNotice = null
         sessionScope.launch {
+            var laterNotice: String? = null
             val planned = withContext(Dispatchers.Default) {
                 runCatching {
                     val network = networkProvider?.invoke()
                     if (network == null) {
                         demoJourney(from, to)
                     } else {
-                        JourneyPlanner(network).plan(
-                            JourneyRequest(
-                                origin = from,
-                                destination = to,
-                                time = JourneyTime.now(),
-                            ),
-                        )
+                        val planner = JourneyPlanner(network)
+                        val now = planner.plan(JourneyRequest(origin = from, destination = to, time = JourneyTime.now()))
+                        if (now.status != JourneyStatus.NoService) {
+                            now
+                        } else {
+                            val (departure, tomorrow) = nextMorningService(UtcDateTime.now())
+                            val later = planner.plan(
+                                JourneyRequest(origin = from, destination = to, time = JourneyTime.leaveAt(departure)),
+                            )
+                            if (later.status == JourneyStatus.Success && later.itineraries.isNotEmpty()) {
+                                laterNotice = if (tomorrow) strings.routesTomorrow else strings.routesLaterToday
+                                later
+                            } else {
+                                now
+                            }
+                        }
                     }
                 }
             }
             planning = false
             planned.onSuccess { response ->
                 journey = response
+                planNotice = laterNotice
                 if (response.status == JourneyStatus.Success && response.itineraries.isNotEmpty()) {
                     selectedItineraryIndex = 0
                     selectedItinerary = response.itineraries.first()
@@ -1216,6 +1229,13 @@ class AppSession(
         return listOf(from, to)
     }
 
+    private fun nextMorningService(now: UtcDateTime): Pair<UtcDateTime, Boolean> {
+        val lima = addMinutes(now, -LIMA_OFFSET_MINUTES)
+        val today = UtcDateTime.of(lima.year, lima.month, lima.day, MORNING_SERVICE_UTC_HOUR)
+        return if (today.isAfter(now)) today to false
+        else UtcDateTime.of(lima.year, lima.month, lima.day + 1, MORNING_SERVICE_UTC_HOUR) to true
+    }
+
     private fun demoJourney(from: GeoPoint, to: GeoPoint): JourneyResponse {
         val now = UtcDateTime.now()
         val arrive = addMinutes(now, 30.0)
@@ -1289,5 +1309,7 @@ class AppSession(
         const val REPORT_OK = "report-ok"
         const val REPORT_CONFIRMED = "report-confirmed"
         private const val SEARCH_DEBOUNCE_MS = 180L
+        private const val LIMA_OFFSET_MINUTES = 300.0
+        private const val MORNING_SERVICE_UTC_HOUR = 12
     }
 }
