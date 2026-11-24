@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     kotlin("multiplatform")
     id("com.android.application")
@@ -15,7 +17,6 @@ kotlin {
                 implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
                 implementation("com.google.firebase:firebase-auth")
                 implementation("com.google.firebase:firebase-firestore")
-                implementation("com.google.android.gms:play-services-auth:21.2.0")
                 implementation("com.google.android.gms:play-services-location:21.3.0")
                 implementation("org.maplibre.gl:android-sdk:11.5.2")
                 implementation("androidx.profileinstaller:profileinstaller:1.3.1")
@@ -23,6 +24,22 @@ kotlin {
         }
     }
 }
+
+val signingProps = Properties().apply {
+    val path = System.getenv("GOWAYKI_SIGNING_PROPERTIES")
+        ?: "${System.getProperty("user.home")}/.gowayki-signing/key.properties"
+    val f = file(path)
+    if (f.isFile) f.inputStream().use { load(it) }
+}
+fun signingValue(key: String, env: String): String? =
+    signingProps.getProperty(key)?.takeIf { it.isNotBlank() } ?: System.getenv(env)?.takeIf { it.isNotBlank() }
+
+val releaseStoreFile = signingValue("storeFile", "GOWAYKI_STORE_FILE")?.let { file(it) }
+val releaseStorePassword = signingValue("storePassword", "GOWAYKI_STORE_PASSWORD")
+val releaseKeyAlias = signingValue("keyAlias", "GOWAYKI_KEY_ALIAS")
+val releaseKeyPassword = signingValue("keyPassword", "GOWAYKI_KEY_PASSWORD")
+val releaseSigningReady = releaseStoreFile?.isFile == true &&
+    listOf(releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { it != null }
 
 android {
     compileSdk = (findProperty("android.compileSdk") as String).toInt()
@@ -43,9 +60,21 @@ android {
             "\"959294066022-7jl40t2irpfk5p9f2nn9j5b4og4es583.apps.googleusercontent.com\"",
         )
     }
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -72,4 +101,12 @@ android {
 
 dependencies {
     "baselineProfile"(project(":baselineprofile"))
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst {
+        check(releaseSigningReady) {
+            "Release sin firma: falta ~/.gowayki-signing/key.properties o GOWAYKI_* (ver docs/RELEASE.md). Nunca firmar release con debug."
+        }
+    }
 }
