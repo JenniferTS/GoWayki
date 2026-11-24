@@ -15,6 +15,7 @@ data class Pothole(val id: Long, val lane: Int, val x: Float, val seed: Int)
  * Sin UI ni reloj propio: la pantalla llama [step] con el tiempo de cada cuadro.
  * Un bache tocado termina la partida; solo [start] empieza otra.
  * Valores de referencia: `WaykiEngine` de Flutter (velocidad ×2 en 90 s, aparición 1,1 → 0,65 s).
+ * Después de la rampa la velocidad sigue subiendo al mismo ritmo, así la partida no dura para siempre.
  */
 class CombiRunEngine(
     val config: Config = Config(),
@@ -32,10 +33,15 @@ class CombiRunEngine(
         /** Distancia máxima entre carriles (en carriles) para que cuente el choque. */
         val laneTolerance: Float = 0.4f,
         val startSpeed: Float = 380f,
+        /** Velocidad al final de [rampSeconds]; después sigue subiendo con la misma pendiente. */
         val maxSpeed: Float = 760f,
+        /** Techo absoluto: con [maxStepSeconds] un bache nunca salta la ventana de choque. */
+        val absoluteMaxSpeed: Float = 3000f,
         val rampSeconds: Float = 90f,
         val startSpawnSeconds: Float = 1.1f,
         val minSpawnSeconds: Float = 0.65f,
+        /** Piso de aparición pasada la rampa. */
+        val spawnFloorSeconds: Float = 0.4f,
         val firstSpawnSeconds: Float = 0.9f,
         val laneChangeSeconds: Float = 0.14f,
         /** Unidades de mundo recorridas por punto. */
@@ -83,13 +89,14 @@ class CombiRunEngine(
     val durationMs: Int get() = (elapsedSeconds * 1000f).toInt()
 
     fun speed(): Float {
-        val t = (elapsedSeconds / config.rampSeconds).coerceIn(0f, 1f)
-        return config.startSpeed + (config.maxSpeed - config.startSpeed) * t
+        val t = (elapsedSeconds / config.rampSeconds).coerceAtLeast(0f)
+        return (config.startSpeed + (config.maxSpeed - config.startSpeed) * t).coerceAtMost(config.absoluteMaxSpeed)
     }
 
     fun spawnInterval(): Float {
-        val t = (elapsedSeconds / config.rampSeconds).coerceIn(0f, 1f)
-        return config.startSpawnSeconds + (config.minSpawnSeconds - config.startSpawnSeconds) * t
+        val t = (elapsedSeconds / config.rampSeconds).coerceAtLeast(0f)
+        return (config.startSpawnSeconds + (config.minSpawnSeconds - config.startSpawnSeconds) * t)
+            .coerceAtLeast(config.spawnFloorSeconds)
     }
 
     fun start() {
