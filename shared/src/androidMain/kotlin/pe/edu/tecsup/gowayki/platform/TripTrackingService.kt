@@ -1,5 +1,6 @@
 package pe.edu.tecsup.gowayki.platform
 
+import pe.edu.tecsup.gowayki.i18n.StringCatalog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -50,8 +51,8 @@ class TripTrackingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("GoWayki · Viaje en curso")
-            .setContentText("Te avisamos antes de bajar")
+            .setContentTitle(StringCatalog.current.tripNotificationTitle)
+            .setContentText(StringCatalog.current.tripNotificationBody)
             .setSmallIcon(android.R.drawable.ic_dialog_map)
             .setContentIntent(pi)
             .setOngoing(true)
@@ -100,7 +101,7 @@ class TripTrackingService : Service() {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Viaje GoWayki", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ID, StringCatalog.current.tripChannelName, NotificationManager.IMPORTANCE_LOW),
         )
     }
 

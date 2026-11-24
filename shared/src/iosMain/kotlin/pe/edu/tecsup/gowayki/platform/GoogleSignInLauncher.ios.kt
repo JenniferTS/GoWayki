@@ -8,3 +8,5 @@ actual fun launchPlatformGoogleSignIn(
 ) {
     onError("Google Sign-In en iOS aún no está habilitado en esta build.")
 }
+
+actual fun signOutPlatformGoogle() {}

@@ -1,12 +1,16 @@
 package pe.edu.tecsup.gowayki.data.auth
 
 import android.app.Activity
-import android.content.Intent
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
-import com.google.android.gms.common.api.ApiException
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlin.coroutines.resume
@@ -16,85 +20,67 @@ import pe.edu.tecsup.gowayki.domain.auth.AuthRepository
 import pe.edu.tecsup.gowayki.domain.auth.SignedInUser
 
 /**
- * Auth real en Android. [prepareGoogleSignIn] limpia sesión previa y entrega el Intent;
- * [completeGoogleSignInAsync] se llama desde Activity Result API.
+ * Auth real en Android: Google vía Credential Manager → credencial Firebase.
+ * Errores de login salen como [GoogleSignInException] con mensaje listo para UI.
  */
 class AndroidFirebaseAuthRepository(
     private val activity: Activity,
-    webClientId: String,
+    private val webClientId: String,
 ) : AuthRepository {
     private val auth = FirebaseAuth.getInstance()
-    private val googleClient: GoogleSignInClient = GoogleSignIn.getClient(
-        activity,
-        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(webClientId)
-            .requestEmail()
-            .requestProfile()
-            .build(),
-    )
+    private val credentialManager = CredentialManager.create(activity)
 
-    /** Cierra cuenta Google cacheada y luego entrega el Intent de login. */
-    fun prepareGoogleSignIn(onReady: (Intent) -> Unit) {
-        googleClient.signOut().addOnCompleteListener {
-            onReady(googleClient.signInIntent)
-        }
-    }
-
-    fun beginGoogleSignIn(): Intent = googleClient.signInIntent
-
-    fun completeGoogleSignInAsync(
-        data: Intent?,
-        onSuccess: (SignedInUser) -> Unit,
-        onError: (String) -> Unit,
-    ) {
-        if (data == null) {
-            onError("Inicio de sesión cancelado.")
-            return
-        }
-        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-        val account = try {
-            task.getResult(ApiException::class.java)
-        } catch (e: ApiException) {
-            onError(messageForGoogleStatus(e.statusCode, e.message))
-            return
-        } catch (e: Exception) {
-            onError("Google Sign-In falló: ${e.message ?: "error desconocido"}")
-            return
-        }
-        val idToken = account.idToken
-        if (idToken.isNullOrBlank()) {
-            onError("Google no devolvió idToken. Revisa el Web Client ID / SHA del APK.")
-            return
-        }
+    override suspend fun signInWithGoogle(): SignedInUser {
+        val idToken = requestGoogleIdToken()
         val credential = GoogleAuthProvider.getCredential(idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnSuccessListener { result ->
-                val u = result.user
-                if (u == null) {
-                    onError("Firebase no devolvió usuario.")
-                    return@addOnSuccessListener
+        return suspendCoroutine { cont ->
+            auth.signInWithCredential(credential)
+                .addOnSuccessListener { result ->
+                    val u = result.user
+                    if (u == null) {
+                        cont.resumeWithException(GoogleSignInException("Firebase no devolvió usuario."))
+                    } else {
+                        cont.resume(
+                            SignedInUser(
+                                uid = u.uid,
+                                displayName = u.displayName,
+                                email = u.email,
+                                isAnonymous = u.isAnonymous,
+                                isNewUser = result.additionalUserInfo?.isNewUser == true,
+                            ),
+                        )
+                    }
                 }
-                onSuccess(
-                    SignedInUser(
-                        uid = u.uid,
-                        displayName = u.displayName ?: account.displayName,
-                        email = u.email ?: account.email,
-                        isAnonymous = u.isAnonymous,
-                        isNewUser = result.additionalUserInfo?.isNewUser == true,
-                    ),
-                )
-            }
-            .addOnFailureListener { e ->
-                onError(e.message ?: "Auth Firebase falló")
-            }
+                .addOnFailureListener { e ->
+                    cont.resumeWithException(GoogleSignInException(e.message ?: "Auth Firebase falló."))
+                }
+        }
     }
 
-    suspend fun completeGoogleSignIn(data: Intent?): SignedInUser = suspendCoroutine { cont ->
-        completeGoogleSignInAsync(
-            data = data,
-            onSuccess = { cont.resume(it) },
-            onError = { cont.resumeWithException(IllegalStateException(it)) },
-        )
+    private suspend fun requestGoogleIdToken(): String {
+        val option = GetSignInWithGoogleOption.Builder(webClientId).build()
+        val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+        val credential = try {
+            credentialManager.getCredential(activity, request).credential
+        } catch (e: GetCredentialCancellationException) {
+            throw GoogleSignInException("Inicio de sesión cancelado.", cancelled = true)
+        } catch (e: NoCredentialException) {
+            throw GoogleSignInException("No hay cuentas de Google en el dispositivo.")
+        } catch (e: GetCredentialException) {
+            throw GoogleSignInException(
+                "Google Sign-In falló (${e.type}). Revisa SHA-1 del APK / Web Client ID.",
+            )
+        }
+        if (credential !is CustomCredential ||
+            credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+        ) {
+            throw GoogleSignInException("Credencial inesperada: ${credential.type}")
+        }
+        return try {
+            GoogleIdTokenCredential.createFrom(credential.data).idToken
+        } catch (e: GoogleIdTokenParsingException) {
+            throw GoogleSignInException("Google no devolvió un idToken válido.")
+        }
     }
 
     override fun currentUser(): SignedInUser? {
@@ -119,22 +105,10 @@ class AndroidFirebaseAuthRepository(
             .addOnFailureListener { cont.resumeWithException(it) }
     }
 
-    override suspend fun signInWithGoogle(): SignedInUser {
-        throw UnsupportedOperationException("En Android usa prepareGoogleSignIn + completeGoogleSignIn.")
-    }
-
     override suspend fun signOut() {
         auth.signOut()
-        googleClient.signOut()
-    }
-
-    private fun messageForGoogleStatus(code: Int, detail: String?): String = when (code) {
-        GoogleSignInStatusCodes.SIGN_IN_CANCELLED -> "Inicio de sesión cancelado."
-        GoogleSignInStatusCodes.SIGN_IN_CURRENTLY_IN_PROGRESS -> "Ya hay un inicio de sesión en curso."
-        GoogleSignInStatusCodes.NETWORK_ERROR -> "Sin red. Revisa tu conexión e inténtalo de nuevo."
-        GoogleSignInStatusCodes.DEVELOPER_ERROR ->
-            "Configuración Google incompleta (SHA-1 del APK / cliente OAuth)."
-        GoogleSignInStatusCodes.INVALID_ACCOUNT -> "Cuenta de Google no válida."
-        else -> "Google Sign-In falló (código $code)${detail?.let { ": $it" } ?: "."}"
+        runCatching { credentialManager.clearCredentialState(ClearCredentialStateRequest()) }
     }
 }
+
+class GoogleSignInException(message: String, val cancelled: Boolean = false) : Exception(message)

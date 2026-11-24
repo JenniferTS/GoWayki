@@ -5,7 +5,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import pe.edu.tecsup.gowayki.ui.LocalStrings
 import androidx.compose.runtime.remember
 import pe.edu.tecsup.gowayki.domain.planner.PlannerNetwork
 import pe.edu.tecsup.gowayki.domain.preferences.InMemoryPreferencesRepository
@@ -64,6 +69,12 @@ fun App() {
     }
     GowaykiTheme(reduceMotion = session.reduceMotion) {
         val reduce = LocalMotionPrefs.current.reduceMotion
+        CompositionLocalProvider(LocalStrings provides session.strings) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = GowaykiTheme.colors.background,
+            contentColor = GowaykiTheme.colors.onSurface,
+        ) {
         AnimatedContent(
             targetState = session.screen,
             transitionSpec = {
@@ -92,6 +103,8 @@ fun App() {
                 Screen.ActiveTrip -> ActiveTripScreen(session)
                 Screen.Lines -> LinesScreen(session)
             }
+        }
+        }
         }
     }
 }

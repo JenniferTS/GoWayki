@@ -18,3 +18,5 @@ actual fun platformWatchTripLocation(onFix: (PositionFix) -> Unit): () -> Unit =
 actual fun platformStartTripTracking(onFix: (PositionFix) -> Unit): () -> Unit = { }
 actual fun platformStopTripTracking() = Unit
 actual fun platformHaptic(kind: HapticKind) = Unit
+actual val platformIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default
+actual fun platformIsDebugBuild(): Boolean = false

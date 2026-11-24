@@ -6,3 +6,5 @@ expect fun launchPlatformGoogleSignIn(
     onSuccess: (SignedInUser) -> Unit,
     onError: (String) -> Unit,
 )
+
+expect fun signOutPlatformGoogle()

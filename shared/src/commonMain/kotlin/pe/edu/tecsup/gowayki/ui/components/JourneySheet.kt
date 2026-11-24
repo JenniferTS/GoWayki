@@ -20,13 +20,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiElevation
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiRadius
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiSize
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiSpace
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiTheme
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiMotion
 import pe.edu.tecsup.gowayki.ui.theme.LocalMotionPrefs
 import androidx.compose.animation.core.Animatable
@@ -65,15 +68,18 @@ fun JourneySheet(
         else heightPx.animateTo(target, GowaykiMotion.panel())
     }
     val currentDp = with(density) { heightPx.value.toDp() }
+    val colors = GowaykiTheme.colors
+    val sheetShape = RoundedCornerShape(topStart = GowaykiRadius.lg, topEnd = GowaykiRadius.lg)
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .height(currentDp)
-            .shadow(16.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        color = Color.White,
-        elevation = 0.dp,
+            .shadow(GowaykiElevation.raised, sheetShape),
+        shape = sheetShape,
+        color = colors.surfaceElevated,
+        contentColor = colors.onSurface,
+        elevation = GowaykiElevation.none,
     ) {
         Column(Modifier.fillMaxWidth()) {
             Box(
@@ -115,23 +121,23 @@ fun JourneySheet(
                             },
                         )
                     }
-                    .padding(top = 10.dp, bottom = 6.dp),
+                    .padding(top = GowaykiSpace.smd, bottom = GowaykiSpace.sm),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
                     Modifier
-                        .width(42.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(99.dp))
-                        .background(GowaykiColors.Outline),
+                        .width(GowaykiSize.sheetHandleWidth)
+                        .height(GowaykiSize.sheetHandleHeight)
+                        .clip(RoundedCornerShape(GowaykiRadius.pill))
+                        .background(colors.outline),
                 )
             }
             Column(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(max = fullHeight)
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 10.dp),
+                    .padding(horizontal = GowaykiSpace.md)
+                    .padding(bottom = GowaykiSpace.smd),
             ) {
                 content(snap)
             }
