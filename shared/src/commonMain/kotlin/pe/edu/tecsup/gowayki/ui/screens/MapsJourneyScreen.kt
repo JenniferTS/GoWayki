@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -208,8 +209,14 @@ fun MapsJourneyScreen(session: AppSession) {
                 return@JourneySheet
             }
 
+            session.planNotice?.let { notice ->
+                Text(notice, style = MaterialTheme.typography.caption, color = colors.onSurfaceMuted)
+                Spacer(Modifier.height(GowaykiSpace.sm))
+            }
+
             LazyRow(
                 Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(GowaykiSpace.xs),
                 horizontalArrangement = Arrangement.spacedBy(GowaykiSpace.sm),
             ) {
                 itemsIndexed(list, key = { index, _ -> "$planKey#$index" }) { index, option ->
