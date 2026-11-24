@@ -58,11 +58,11 @@ actual fun rememberMicroBitmap(micro: Micro, targetWidthPx: Int): ImageBitmap? {
     val resources = LocalContext.current.resources
     val bucket = Integer.highestOneBit(targetWidthPx.coerceAtLeast(1))
     val key = "${micro.name}@$bucket"
+    // Al cambiar de combi, produceState conserva el valor anterior: hay que reemplazarlo siempre
+    // (antes solo cargaba si era null, y el juego seguía mostrando la primera combi).
     val bitmap by produceState(initialValue = microCache.get(key), key) {
-        if (value == null) {
-            value = withContext(Dispatchers.IO) {
-                microCache.get(key) ?: decodeMicro(resources, micro, targetWidthPx)?.also { microCache.put(key, it) }
-            }
+        value = microCache.get(key) ?: withContext(Dispatchers.IO) {
+            microCache.get(key) ?: decodeMicro(resources, micro, targetWidthPx)?.also { microCache.put(key, it) }
         }
     }
     return bitmap

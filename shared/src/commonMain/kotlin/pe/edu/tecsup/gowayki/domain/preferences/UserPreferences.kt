@@ -165,9 +165,25 @@ interface PreferencesRepository {
     fun saveFavorites(places: List<SavedPlace>)
     fun readRecents(): List<RecentTrip>
     fun saveRecents(trips: List<RecentTrip>)
-    /** Líneas `week|score|durationMs`. */
-    fun readPendingScores(): List<String>
-    fun savePendingScores(lines: List<String>)
+    /** Cola de puntajes de una cuenta: líneas `week|score|durationMs`. */
+    fun readPendingScores(uid: String): List<String>
+    fun savePendingScores(uid: String, lines: List<String>)
+
+    /** Cola única sin uid de versiones anteriores: no se sabe de qué cuenta es, solo se descarta. */
+    fun hasLegacyPendingScores(): Boolean
+    fun discardLegacyPendingScores()
+
+    /** El usuario aceptó el aviso de ubicación antes del permiso del sistema. */
+    fun readLocationDisclosureAccepted(): Boolean
+    fun saveLocationDisclosureAccepted(accepted: Boolean)
+
+    /** Cuentas con borrado iniciado y sin terminar: sus subidas quedan en pausa hasta completarlo. */
+    fun readAccountsBeingDeleted(): Set<String>
+    fun saveAccountBeingDeleted(uid: String, deleting: Boolean)
+
+    /** Combi elegida en Wayki Combi (nombre del enum `Micro`). */
+    fun readGameCombi(): String?
+    fun saveGameCombi(name: String)
     fun locale(deviceLanguage: String?): AppLocale = AppLocale.resolve(readLocaleCode(), deviceLanguage)
 }
 
@@ -180,7 +196,11 @@ class InMemoryPreferencesRepository : PreferencesRepository {
     private var alarmMode: String? = null
     private var favorites: List<SavedPlace> = emptyList()
     private var recents: List<RecentTrip> = emptyList()
-    private var pendingScores: List<String> = emptyList()
+    private val pendingScores = mutableMapOf<String, List<String>>()
+    private var legacyPendingScores: List<String> = emptyList()
+    private var locationDisclosureAccepted = false
+    private val accountsBeingDeleted = mutableSetOf<String>()
+    private var gameCombi: String? = null
 
     override fun readCityCode(): String? = cityCode
 
@@ -224,9 +244,34 @@ class InMemoryPreferencesRepository : PreferencesRepository {
         recents = trips.take(10)
     }
 
-    override fun readPendingScores(): List<String> = pendingScores
-    override fun savePendingScores(lines: List<String>) {
-        pendingScores = lines
+    override fun readPendingScores(uid: String): List<String> = pendingScores[uid].orEmpty()
+    override fun savePendingScores(uid: String, lines: List<String>) {
+        if (lines.isEmpty()) pendingScores.remove(uid) else pendingScores[uid] = lines
+    }
+
+    override fun hasLegacyPendingScores(): Boolean = legacyPendingScores.isNotEmpty()
+    override fun discardLegacyPendingScores() {
+        legacyPendingScores = emptyList()
+    }
+
+    /** Simula la cola compartida que dejaban las versiones anteriores. */
+    fun seedLegacyPendingScores(lines: List<String>) {
+        legacyPendingScores = lines
+    }
+
+    override fun readLocationDisclosureAccepted(): Boolean = locationDisclosureAccepted
+    override fun saveLocationDisclosureAccepted(accepted: Boolean) {
+        locationDisclosureAccepted = accepted
+    }
+
+    override fun readGameCombi(): String? = gameCombi
+    override fun saveGameCombi(name: String) {
+        gameCombi = name
+    }
+
+    override fun readAccountsBeingDeleted(): Set<String> = accountsBeingDeleted.toSet()
+    override fun saveAccountBeingDeleted(uid: String, deleting: Boolean) {
+        if (deleting) accountsBeingDeleted.add(uid) else accountsBeingDeleted.remove(uid)
     }
 }
 

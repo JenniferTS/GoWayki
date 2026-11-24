@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
 import pe.edu.tecsup.gowayki.domain.community.ReportKind
+import pe.edu.tecsup.gowayki.domain.legal.LegalLinks
 import pe.edu.tecsup.gowayki.domain.models.TransitLine
 import pe.edu.tecsup.gowayki.domain.planner.GeoPoint
 import pe.edu.tecsup.gowayki.domain.planner.TransitLeg
@@ -76,6 +77,7 @@ import pe.edu.tecsup.gowayki.ui.components.AtmosphereBackground
 import pe.edu.tecsup.gowayki.ui.components.BottomNavBar
 import pe.edu.tecsup.gowayki.ui.components.BrandHero
 import pe.edu.tecsup.gowayki.ui.components.BrandMark
+import pe.edu.tecsup.gowayki.ui.components.DangerButton
 import pe.edu.tecsup.gowayki.ui.components.ChoiceRow
 import pe.edu.tecsup.gowayki.ui.components.EnterContent
 import pe.edu.tecsup.gowayki.ui.components.GlassPanel
@@ -161,6 +163,17 @@ fun HomeScreen(session: AppSession) {
                 ) {
                     HomeSearchCard(session)
                     HomeShortcuts(session)
+                    session.locationMessage?.takeIf { !session.locating }?.let { msg ->
+                        Text(
+                            msg,
+                            style = MaterialTheme.typography.caption,
+                            color = colors.onSurface,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(GowaykiRadius.sm))
+                                .background(colors.surfaceElevated)
+                                .padding(horizontal = GowaykiSpace.smd, vertical = GowaykiSpace.sm),
+                        )
+                    }
                 }
                 Box(
                     Modifier
@@ -599,9 +612,14 @@ fun ProfileScreen(session: AppSession) {
                 )
             }
             Spacer(Modifier.height(GowaykiSpace.xs))
+            session.accountNotice?.let { InlineMessage(it, isError = false) }
             if (isGuest) {
                 PrimaryButton(s.signIn, onClick = { session.go(Screen.Auth) })
             } else {
+                if (session.accountDeletionPending) {
+                    InlineMessage(s.accountDeletionPending, isError = true)
+                    PrimaryButton(s.accountDeletionResume, onClick = { session.openDeleteAccount() })
+                }
                 SoftButton(s.signOut, onClick = { session.signOutToGuest() })
             }
             Spacer(Modifier.height(GowaykiSpace.smd))
@@ -610,7 +628,69 @@ fun ProfileScreen(session: AppSession) {
             SoftButton(s.linesExplorer, onClick = { session.go(Screen.Lines) })
             SoftButton(s.gameTitle, onClick = { session.go(Screen.Game) })
             SoftButton(s.weeklyRanking, onClick = { session.go(Screen.Ranking) })
+            if (!isGuest && !session.accountDeletionPending) {
+                Spacer(Modifier.height(GowaykiSpace.lg))
+                DangerButton(s.deleteAccount, onClick = { session.openDeleteAccount() })
+            }
             Spacer(Modifier.height(GowaykiSpace.lg))
+        }
+    }
+    if (session.showDeleteAccountDialog && !isGuest) DeleteAccountDialog(session)
+}
+
+/** Confirmación de borrado (Flutter: `delete_account_dialog.dart`): qué se borra, irreversible, progreso y error. */
+@Composable
+private fun DeleteAccountDialog(session: AppSession) {
+    val s = session.strings
+    val colors = GowaykiTheme.colors
+    val busy = session.deletingAccount
+    Popup(
+        alignment = Alignment.Center,
+        onDismissRequest = { session.dismissDeleteAccount() },
+        properties = PopupProperties(focusable = true, dismissOnBackPress = !busy, dismissOnClickOutside = false),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(colors.scrim)
+                .clickable(enabled = true, onClick = {}),
+        ) {
+            GlassPanel(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(GowaykiSpace.md)
+                    .fillMaxWidth(),
+            ) {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(s.deleteAccount, style = MaterialTheme.typography.h6)
+                    Spacer(Modifier.height(GowaykiSpace.smd))
+                    Text(s.accountDeletionWarning, style = MaterialTheme.typography.body2)
+                    Spacer(Modifier.height(GowaykiSpace.sm))
+                    Text(s.accountDeletionMarkerNotice, style = MaterialTheme.typography.caption, color = colors.onSurfaceMuted)
+                    Spacer(Modifier.height(GowaykiSpace.sm))
+                    Text(s.accountDeletionGoogle, style = MaterialTheme.typography.caption, color = colors.onSurfaceMuted)
+                    session.accountDeletionError?.let {
+                        Spacer(Modifier.height(GowaykiSpace.sm))
+                        InlineMessage(it, isError = true)
+                    }
+                    if (busy) {
+                        Spacer(Modifier.height(GowaykiSpace.smd))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(color = colors.primary, modifier = Modifier.size(GowaykiSize.icon))
+                            Spacer(Modifier.width(GowaykiSpace.sm))
+                            Text(s.accountDeleting, style = MaterialTheme.typography.body2)
+                        }
+                    }
+                    Spacer(Modifier.height(GowaykiSpace.md))
+                    DangerButton(
+                        if (session.accountDeletionPending) s.accountDeletionResume else s.deleteAccount,
+                        onClick = { session.deleteAccount() },
+                        enabled = !busy,
+                    )
+                    Spacer(Modifier.height(GowaykiSpace.sm))
+                    SoftButton(s.cancel, onClick = { session.dismissDeleteAccount() }, enabled = !busy)
+                }
+            }
         }
     }
 }
@@ -657,8 +737,32 @@ fun SettingsScreen(session: AppSession) {
                     )
                 }
             }
+            AboutSection(session)
+            Spacer(Modifier.height(GowaykiSpace.lg))
         }
     }
+}
+
+/** Atribución del mapa (ODbL) y enlaces legales; privacidad/términos solo si están configurados. */
+@Composable
+private fun AboutSection(session: AppSession) {
+    val s = session.strings
+    val legal = session.legalLinks
+    SectionTitle(s.about)
+    GlassPanel(Modifier.fillMaxWidth()) {
+        Text(s.aboutMapData, style = MaterialTheme.typography.body2)
+    }
+    Spacer(Modifier.height(GowaykiSpace.sm))
+    Column(verticalArrangement = Arrangement.spacedBy(GowaykiSpace.sm)) {
+        SoftButton(s.osmAttribution, onClick = { session.openLink(LegalLinks.OSM_COPYRIGHT) })
+        SoftButton(s.openMapTilesAttribution, onClick = { session.openLink(LegalLinks.OPENMAPTILES) })
+        legal.privacy?.let { url -> SoftButton(s.privacy, onClick = { session.openLink(url) }) }
+        legal.terms?.let { url -> SoftButton(s.terms, onClick = { session.openLink(url) }) }
+    }
+    if (legal.privacy == null || legal.terms == null) {
+        InlineMessage(s.legalUnavailable, isError = false)
+    }
+    session.linkError?.let { InlineMessage(it, isError = true) }
 }
 
 @Composable
@@ -698,6 +802,7 @@ fun ActiveTripScreen(session: AppSession) {
                 state.progress.stopsRemaining?.let {
                     Text(s.format(s.stopsRemainingCount, it), style = MaterialTheme.typography.body2)
                 }
+                session.tripMessage?.takeIf { state.running }?.let { InlineMessage(it, isError = false) }
             }
             Spacer(Modifier.height(GowaykiSpace.md))
             Column(verticalArrangement = Arrangement.spacedBy(GowaykiSpace.sm)) {

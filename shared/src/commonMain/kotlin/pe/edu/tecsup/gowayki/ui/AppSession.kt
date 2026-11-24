@@ -12,6 +12,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import pe.edu.tecsup.gowayki.domain.account.AccountDeletionController
+import pe.edu.tecsup.gowayki.domain.account.AccountDeletionError
+import pe.edu.tecsup.gowayki.domain.account.AccountDeletionException
 import pe.edu.tecsup.gowayki.domain.auth.SignedInUser
 import pe.edu.tecsup.gowayki.domain.community.CommunityReport
 import pe.edu.tecsup.gowayki.domain.community.InMemoryReportsRepository
@@ -20,8 +23,12 @@ import pe.edu.tecsup.gowayki.domain.community.ReportKind
 import pe.edu.tecsup.gowayki.domain.community.ReportsRepository
 import pe.edu.tecsup.gowayki.domain.community.StoredReport
 import pe.edu.tecsup.gowayki.domain.game.PendingScore
+import pe.edu.tecsup.gowayki.domain.game.PendingScoreQueue
 import pe.edu.tecsup.gowayki.domain.game.WeeklyRanking
 import pe.edu.tecsup.gowayki.domain.game.rankingWeek
+import pe.edu.tecsup.gowayki.domain.legal.LegalLinks
+import pe.edu.tecsup.gowayki.domain.location.LocationAccessStep
+import pe.edu.tecsup.gowayki.domain.location.LocationConsent
 import pe.edu.tecsup.gowayki.domain.models.CityStop
 import pe.edu.tecsup.gowayki.domain.models.PlaceResult
 import pe.edu.tecsup.gowayki.domain.models.TransitLine
@@ -56,17 +63,23 @@ import pe.edu.tecsup.gowayki.domain.tracking.TripProgress
 import pe.edu.tecsup.gowayki.domain.tracking.TripTracker
 import pe.edu.tecsup.gowayki.i18n.StringCatalog
 import pe.edu.tecsup.gowayki.i18n.Strings
+import pe.edu.tecsup.gowayki.ui.components.Micro
 import pe.edu.tecsup.gowayki.platform.AlarmMode
 import pe.edu.tecsup.gowayki.platform.PlatformLocation
+import pe.edu.tecsup.gowayki.platform.platformAccountDeletion
 import pe.edu.tecsup.gowayki.platform.platformClearTripNotifications
 import pe.edu.tecsup.gowayki.platform.platformFetchCurrentLocation
+import pe.edu.tecsup.gowayki.platform.platformHasLocationPermission
 import pe.edu.tecsup.gowayki.platform.platformIoDispatcher
 import pe.edu.tecsup.gowayki.platform.platformIsDebugBuild
 import pe.edu.tecsup.gowayki.platform.platformIsLocationEnabled
 import pe.edu.tecsup.gowayki.platform.platformLastLocation
+import pe.edu.tecsup.gowayki.platform.platformOpenAppSettings
+import pe.edu.tecsup.gowayki.platform.platformOpenUrl
 import pe.edu.tecsup.gowayki.platform.platformRanking
 import pe.edu.tecsup.gowayki.platform.platformRemoteReports
 import pe.edu.tecsup.gowayki.platform.platformRequestLocationPermission
+import pe.edu.tecsup.gowayki.platform.platformRequestNotificationPermission
 import pe.edu.tecsup.gowayki.platform.platformStartTripTracking
 import pe.edu.tecsup.gowayki.platform.platformStopTripTracking
 import pe.edu.tecsup.gowayki.platform.platformTripAlert
@@ -89,6 +102,8 @@ sealed class Screen {
     data object Auth : Screen()
     data object ActiveTrip : Screen()
     data object Lines : Screen()
+    /** Aviso destacado de ubicación, siempre antes del diálogo del sistema. */
+    data object LocationDisclosure : Screen()
 }
 
 data class AuthUser(
@@ -121,6 +136,7 @@ class AppSession(
     private val deviceLanguage: String? = "es",
     startAsGuest: Boolean = true,
     private val initialSignedIn: SignedInUser? = null,
+    val legalLinks: LegalLinks = LegalLinks(),
 ) {
     var locale by mutableStateOf(preferences.locale(deviceLanguage))
         private set
@@ -189,7 +205,33 @@ class AppSession(
     var authBusy by mutableStateOf(false)
     var reportSending by mutableStateOf(false)
     var authError by mutableStateOf<String?>(null)
+    var locationDisclosureBusy by mutableStateOf(false)
+        private set
+    /** El usuario aceptó el aviso pero rechazó el diálogo del sistema. */
+    var locationDisclosureDenied by mutableStateOf(false)
+        private set
+    var showDeleteAccountDialog by mutableStateOf(false)
+    var deletingAccount by mutableStateOf(false)
+        private set
+    var accountDeletionError by mutableStateOf<String?>(null)
+        private set
+    /** Borrado que empezó y no terminó para la cuenta actual: subidas en pausa hasta reintentar. */
+    var accountDeletionPending by mutableStateOf(false)
+        private set
+    /** Aviso en Perfil tras borrar la cuenta. */
+    var accountNotice by mutableStateOf<String?>(null)
+    var linkError by mutableStateOf<String?>(null)
+    /** Combi del jugador en Wayki Combi; la elección se guarda. */
+    var gameCombi by mutableStateOf(
+        Micro.entries.firstOrNull { it.name == preferences.readGameCombi() } ?: Micro.AlbotranCb,
+    )
+        private set
 
+    private val scoreQueue = PendingScoreQueue(preferences)
+    private var disclosureReturnTo: Screen = Screen.Home
+    private var pendingLocationResult: ((Boolean) -> Unit)? = null
+    private var userWatchWanted = false
+    private val cloudJobs = mutableListOf<Job>()
     private var tracker: TripTracker? = null
     private var stopLocationWatch: (() -> Unit)? = null
     private var stopUserLocationWatchHandle: (() -> Unit)? = null
@@ -217,7 +259,9 @@ class AppSession(
      */
     fun bootstrap() {
         packReady = networkProvider?.invoke() != null
-        pendingScoreCount = preferences.readPendingScores().size
+        // La cola única de versiones anteriores no dice de qué cuenta es: se descarta
+        // para no publicar esos puntos en la cuenta que esté abierta.
+        if (preferences.hasLegacyPendingScores()) preferences.discardLegacyPendingScores()
         val restored = initialSignedIn?.takeIf { !it.isAnonymous }
         if (restored != null) {
             applyGoogleUser(restored.uid, restored.displayName, isNew = false)
@@ -228,7 +272,8 @@ class AppSession(
             refreshNearbyReports()
         }
         refreshPackMapData()
-        warmLocation(setAsOrigin = false)
+        // Sin pedir permisos al abrir: solo usa la ubicación si ya estaba concedida.
+        warmLocation(setAsOrigin = false, userInitiated = false)
     }
 
     fun setAlarm(mode: AlarmMode) {
@@ -283,11 +328,19 @@ class AppSession(
         val status = if (skipped) OnboardingStatus.Skipped else OnboardingStatus.Completed
         preferences.saveOnboarding(status)
         val uid = user?.takeIf { !it.isGuest }?.uid
-        if (uid != null) {
-            sessionScope.launch { io { runCatching { platformUserStateSync().pushOnboarding(uid, status) } } }
+        if (uid != null && cloudActive(uid)) {
+            launchCloudWrite { io { runCatching { platformUserStateSync().pushOnboarding(uid, status) } } }
         }
-        screen = Screen.Home
         maybeStartTutorial()
+        if (platformHasLocationPermission()) {
+            screen = Screen.Home
+        } else {
+            // Como Flutter (/bienvenida -> /ubicacion): el aviso va tras la bienvenida y el
+            // diálogo del sistema solo se abre si el usuario toca "Permitir ubicación".
+            showLocationDisclosure(returnTo = Screen.Home) { granted ->
+                if (granted) warmLocation(setAsOrigin = false, userInitiated = false)
+            }
+        }
     }
 
     fun go(to: Screen) {
@@ -297,19 +350,87 @@ class AppSession(
             refreshPackMapData()
         }
         if (to == Screen.Search) {
-            warmLocation(setAsOrigin = origin == null, onlyIfOriginEmpty = true)
+            warmLocation(setAsOrigin = origin == null, onlyIfOriginEmpty = true, userInitiated = false)
         }
         if (to == Screen.Ranking) loadRanking()
         if (to == Screen.Lines) refreshPackMapData()
     }
 
-    /** Pide permiso + fix fresco (Fused). Opcionalmente rellena origen. */
-    fun warmLocation(setAsOrigin: Boolean = false, onlyIfOriginEmpty: Boolean = false) {
-        locationMessage = null
+    /**
+     * Ruta única hacia el permiso de ubicación. [userInitiated] falso (arranque, abrir pantalla)
+     * nunca pide nada; verdadero muestra primero el aviso destacado si no se aceptó antes.
+     */
+    private fun requestLocationAccess(userInitiated: Boolean, onResult: (Boolean) -> Unit) {
+        val step = LocationConsent.next(
+            hasPermission = platformHasLocationPermission(),
+            userInitiated = userInitiated,
+            disclosureAccepted = preferences.readLocationDisclosureAccepted(),
+        )
+        when (step) {
+            LocationAccessStep.Granted -> onResult(true)
+            LocationAccessStep.Skip -> onResult(false)
+            LocationAccessStep.RequestSystem -> platformRequestLocationPermission { granted ->
+                if (granted) resumeUserLocationWatch()
+                onResult(granted)
+            }
+            LocationAccessStep.ShowDisclosure -> showLocationDisclosure(returnTo = screen, onResult = onResult)
+        }
+    }
+
+    private fun showLocationDisclosure(returnTo: Screen, onResult: (Boolean) -> Unit) {
+        pendingLocationResult?.invoke(false)
+        pendingLocationResult = onResult
+        disclosureReturnTo = if (returnTo == Screen.LocationDisclosure) Screen.Home else returnTo
+        locationDisclosureDenied = false
+        locationDisclosureBusy = false
+        screen = Screen.LocationDisclosure
+    }
+
+    /** "Permitir ubicación" en el aviso: recién aquí se abre el diálogo del sistema. */
+    fun acceptLocationDisclosure() {
+        if (locationDisclosureBusy) return
+        preferences.saveLocationDisclosureAccepted(true)
+        locationDisclosureBusy = true
+        locationDisclosureDenied = false
         platformRequestLocationPermission { granted ->
+            locationDisclosureBusy = false
+            if (granted) {
+                resumeUserLocationWatch()
+                leaveLocationDisclosure(granted = true)
+            } else {
+                locationDisclosureDenied = true
+            }
+        }
+    }
+
+    /** Seguir sin ubicación: la app funciona eligiendo el origen a mano. */
+    fun declineLocationDisclosure() {
+        if (locationDisclosureBusy) return
+        leaveLocationDisclosure(granted = false)
+    }
+
+    fun openLocationSettings() {
+        platformOpenAppSettings()
+    }
+
+    private fun leaveLocationDisclosure(granted: Boolean) {
+        screen = disclosureReturnTo
+        val callback = pendingLocationResult
+        pendingLocationResult = null
+        callback?.invoke(granted)
+    }
+
+    /** Fix fresco (Fused); opcionalmente rellena el origen. */
+    fun warmLocation(
+        setAsOrigin: Boolean = false,
+        onlyIfOriginEmpty: Boolean = false,
+        userInitiated: Boolean = true,
+    ) {
+        locationMessage = null
+        requestLocationAccess(userInitiated) { granted ->
             if (!granted) {
-                locationMessage = strings.permissionLocationRationale
-                return@platformRequestLocationPermission
+                if (userInitiated) locationMessage = strings.locationManualOrigin
+                return@requestLocationAccess
             }
             if (!platformIsLocationEnabled()) {
                 locationMessage = strings.locationDisabled
@@ -344,14 +465,13 @@ class AppSession(
         locationFollowEpoch += 1
     }
 
+    /** Seguimiento liviano para el mapa; nunca pide permiso (solo corre si ya está concedido). */
     fun startUserLocationWatch(setOriginIfEmpty: Boolean = false) {
         stopUserLocationWatch()
+        userWatchWanted = true
         val fillOrigin = setOriginIfEmpty && origin == null
-        platformRequestLocationPermission { granted ->
-            if (!granted) {
-                locationMessage = strings.permissionLocationRationale
-                return@platformRequestLocationPermission
-            }
+        requestLocationAccess(userInitiated = false) { granted ->
+            if (!granted) return@requestLocationAccess
             if (!platformIsLocationEnabled()) {
                 locationMessage = strings.locationDisabled
             }
@@ -373,8 +493,17 @@ class AppSession(
     }
 
     fun stopUserLocationWatch() {
+        userWatchWanted = false
         stopUserLocationWatchHandle?.invoke()
         stopUserLocationWatchHandle = null
+    }
+
+    /** Si el mapa quería seguir al usuario y el permiso llegó después, arranca el seguimiento. */
+    private fun resumeUserLocationWatch() {
+        if (!userWatchWanted || stopUserLocationWatchHandle != null) return
+        stopUserLocationWatchHandle = platformWatchUserLocation { loc ->
+            lastKnownLocation = GeoPoint(loc.latitude, loc.longitude)
+        }
     }
 
     private fun applyLocationFix(fix: PlatformLocation, setAsOrigin: Boolean) {
@@ -432,7 +561,11 @@ class AppSession(
             screen = Screen.Auth
             return
         }
-        sessionScope.launch {
+        if (!cloudActive(current.uid)) {
+            reportMessage = strings.accountDeletionPending
+            return
+        }
+        launchCloudWrite {
             val result = io { runCatching { platformRemoteReports()?.confirm(reportId, current.uid) ?: false } }
             result.onSuccess { ok ->
                 reportMessage = if (ok) REPORT_CONFIRMED else strings.alreadyConfirmed
@@ -543,11 +676,11 @@ class AppSession(
     }
 
     fun useCurrentLocationForReport(onNeedPermission: (() -> Unit)? = null) {
-        platformRequestLocationPermission { granted ->
+        requestLocationAccess(userInitiated = true) { granted ->
             if (!granted) {
-                reportMessage = strings.permissionLocationRationale
+                reportMessage = strings.locationManualReport
                 onNeedPermission?.invoke()
-                return@platformRequestLocationPermission
+                return@requestLocationAccess
             }
             if (!platformIsLocationEnabled()) {
                 reportMessage = strings.locationDisabled
@@ -573,6 +706,10 @@ class AppSession(
             return
         }
         if (reportSending) return
+        if (!cloudActive(current.uid)) {
+            reportMessage = strings.accountDeletionPending
+            return
+        }
         val remote = platformRemoteReports()
         val draft = try {
             val id = remote?.newId() ?: reports.newId()
@@ -592,7 +729,7 @@ class AppSession(
         }
         reportSending = true
         reportMessage = null
-        sessionScope.launch {
+        launchCloudWrite {
             val sent = io { runCatching { remote?.createOrReuse(draft, current.uid) } }
             reportSending = false
             sent.onSuccess {
@@ -609,8 +746,8 @@ class AppSession(
 
     fun withdrawReport(id: String) {
         val uid = user?.uid
-        val remoteUid = uid?.takeIf { user?.isGuest == false }
-        sessionScope.launch {
+        val remoteUid = uid?.takeIf { user?.isGuest == false && cloudActive(it) }
+        launchCloudWrite {
             if (remoteUid != null) io { runCatching { platformRemoteReports()?.deleteMine(id, remoteUid) } }
             reports.delete(id)
             myReports = reports.mine(uid)
@@ -660,6 +797,10 @@ class AppSession(
             TutorialMigrationPolicy.resolve(false, preferences.readTutorial())
         }
         preferences.saveTutorial(tutorial)
+        pendingScoreCount = scoreQueue.pending(uid).size
+        accountDeletionPending = scoreQueue.isPaused(uid)
+        accountDeletionError = null
+        accountNotice = null
         val hadLocalOnboarding = preferences.readOnboarding() != null
         if (!hadLocalOnboarding) preferences.saveOnboarding(OnboardingStatus.Completed)
         screen = Screen.Home
@@ -674,8 +815,10 @@ class AppSession(
      * se publica el tutorial, se vacía la cola de puntajes y se carga el ranking.
      */
     private fun syncSignedInUser(uid: String, isNew: Boolean, hadLocalOnboarding: Boolean) {
+        // Borrado a medias: nada se vuelve a escribir en la nube hasta completarlo desde Perfil.
+        if (!cloudActive(uid)) return
         val sync = platformUserStateSync()
-        sessionScope.launch {
+        launchCloudWrite {
             val (remoteTutorial, remoteOnboarding) = withContext(platformIoDispatcher) {
                 val ensured = async { runCatching { sync.ensureUser(uid) } }
                 val pulledTutorial = async { runCatching { sync.pullTutorial(uid) }.getOrNull() }
@@ -683,7 +826,7 @@ class AppSession(
                 ensured.await()
                 pulledTutorial.await() to pulledOnboarding.await()
             }
-            if (user?.uid != uid) return@launch
+            if (user?.uid != uid || !cloudActive(uid)) return@launchCloudWrite
             if (!isNew && remoteTutorial != null && remoteTutorial != tutorial) {
                 tutorial = TutorialMigrationPolicy.resolve(false, remoteTutorial)
                 preferences.saveTutorial(tutorial)
@@ -730,12 +873,17 @@ class AppSession(
         )
     }
 
+    /** La cola de puntajes de la cuenta queda guardada bajo su uid: se publica solo si vuelve a entrar. */
     fun signOutToGuest() {
         pe.edu.tecsup.gowayki.platform.signOutPlatformGoogle()
         user = AuthUser(uid = "guest", displayName = null, isGuest = true)
         showTutorialOverlay = false
         authError = null
         authBusy = false
+        pendingScoreCount = 0
+        accountDeletionPending = false
+        accountDeletionError = null
+        showDeleteAccountDialog = false
     }
 
     fun maybeStartTutorial() {
@@ -781,8 +929,9 @@ class AppSession(
     private fun persistTutorial() {
         preferences.saveTutorial(tutorial)
         val uid = user?.takeIf { !it.isGuest }?.uid ?: return
+        if (!cloudActive(uid)) return
         val progress = tutorial
-        sessionScope.launch { io { runCatching { platformUserStateSync().pushTutorial(uid, progress) } } }
+        launchCloudWrite { io { runCatching { platformUserStateSync().pushTutorial(uid, progress) } } }
     }
 
     fun formatFare(money: Money): String {
@@ -805,16 +954,21 @@ class AppSession(
             progress = tracker!!.initial,
             status = ActiveTripStatus.Starting,
         )
-        platformRequestLocationPermission { granted ->
-            if (!granted) {
-                activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = true)
+        requestLocationAccess(userInitiated = true) { granted ->
+            // Notificaciones solo aquí: son las alertas de bajada/transbordo del viaje activo.
+            platformRequestNotificationPermission {
+                if (activeTrip?.trip !== trip) return@platformRequestNotificationPermission
+                if (!granted) {
+                    tripMessage = strings.tripWithoutLocation
+                    activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = true)
+                    screen = Screen.ActiveTrip
+                    return@platformRequestNotificationPermission
+                }
+                stopLocationWatch?.invoke()
+                stopLocationWatch = platformStartTripTracking { fix -> acceptFix(fix) }
+                activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = false)
                 screen = Screen.ActiveTrip
-                return@platformRequestLocationPermission
             }
-            stopLocationWatch?.invoke()
-            stopLocationWatch = platformStartTripTracking { fix -> acceptFix(fix) }
-            activeTrip = activeTrip?.copy(status = ActiveTripStatus.Active, stale = false)
-            screen = Screen.ActiveTrip
         }
     }
 
@@ -883,82 +1037,147 @@ class AppSession(
         }
     }
 
+    /**
+     * Encola el puntaje en la cola de la cuenta y la publica. Los invitados no encolan ni publican
+     * (como Flutter); una cuenta en borrado tampoco.
+     */
     fun submitGameScore(score: Int, durationMs: Int) {
         lastGameScore = score
         lastGameDurationMs = durationMs
-        val pending = PendingScore(
-            week = rankingWeek(),
-            score = score.coerceIn(0, 5000),
-            durationMs = durationMs.coerceIn(1000, 120_000),
-        )
-        enqueuePendingScore(pending)
         val current = user
         if (current == null || current.isGuest) {
-            rankingMessage = strings.scoreSavedOffline
+            rankingMessage = strings.scoreNeedsAccount
             return
         }
-        rankingMessage = null
-        sessionScope.launch {
-            val published = publishPending(pending, current)
-            if (published) {
-                rankingMessage = null
-                loadRanking()
-                screen = Screen.Ranking
-            } else {
-                rankingMessage = strings.scoreSavedOffline
-            }
+        if (scoreQueue.isPaused(current.uid)) {
+            rankingMessage = strings.accountDeletionPending
+            return
         }
+        val clampedDuration = durationMs.coerceIn(1000, 120_000)
+        val pending = PendingScore(
+            week = rankingWeek(),
+            score = score.coerceIn(0, minOf(5000, clampedDuration / 1000 * 30 + 30)),
+            durationMs = clampedDuration,
+        )
+        if (!scoreQueue.record(current.uid, pending)) {
+            rankingMessage = strings.errorGeneric
+            return
+        }
+        pendingScoreCount = scoreQueue.pending(current.uid).size
+        rankingMessage = null
+        flushPendingScores()
     }
 
     fun flushPendingScores() {
         val current = user?.takeIf { !it.isGuest } ?: return
+        val uid = current.uid
+        if (!cloudActive(uid)) return
         if (flushJob?.isActive == true) return
-        val lines = preferences.readPendingScores().toMutableList()
-        if (lines.isEmpty()) return
-        flushJob = sessionScope.launch {
-            val remaining = mutableListOf<String>()
-            for (line in lines) {
-                val parts = line.split('|')
-                if (parts.size != 3) continue
-                val pending = runCatching {
-                    PendingScore(parts[0], parts[1].toInt(), parts[2].toInt())
-                }.getOrNull() ?: continue
-                if (!publishPending(pending, current)) remaining.add(line)
-            }
-            preferences.savePendingScores(remaining)
-            pendingScoreCount = remaining.size
-            if (remaining.isEmpty()) loadRanking()
+        if (scoreQueue.pending(uid).isEmpty()) {
+            pendingScoreCount = 0
+            return
         }
-    }
-
-    private fun enqueuePendingScore(pending: PendingScore) {
-        val line = "${pending.week}|${pending.score}|${pending.durationMs}"
-        val lines = preferences.readPendingScores().toMutableList()
-        lines.removeAll { it.startsWith("${pending.week}|") && it.split('|').getOrNull(1)?.toIntOrNull()?.let { s -> s <= pending.score } == true }
-        val existing = lines.firstOrNull { it.startsWith("${pending.week}|") }
-        if (existing != null) {
-            val oldScore = existing.split('|').getOrNull(1)?.toIntOrNull() ?: -1
-            if (oldScore >= pending.score) {
-                pendingScoreCount = lines.size
-                return
-            }
-            lines.remove(existing)
-        }
-        lines.add(line)
-        preferences.savePendingScores(lines)
-        pendingScoreCount = lines.size
-    }
-
-    private suspend fun publishPending(pending: PendingScore, current: AuthUser): Boolean {
-        val client = platformRanking() ?: return false
         val name = current.displayName?.ifBlank { null } ?: "Wayki"
-        val ok = io { runCatching { client.publish(current.uid, name, pending) }.isSuccess }
-        if (ok) {
-            val left = preferences.readPendingScores().filterNot { it.startsWith("${pending.week}|") }
-            preferences.savePendingScores(left)
-            pendingScoreCount = left.size
+        flushJob = sessionScope.launch {
+            val result = scoreQueue.flush(
+                uid = uid,
+                isCurrent = { cloudActive(uid) },
+            ) { score ->
+                val client = platformRanking() ?: error("Ranking no disponible")
+                io { client.publish(uid, name, score) }
+            }
+            if (user?.uid != uid) return@launch
+            pendingScoreCount = scoreQueue.pending(uid).size
+            when {
+                result.failed -> rankingMessage = strings.scoreSavedOffline
+                !result.aborted -> {
+                    rankingMessage = null
+                    loadRanking()
+                }
+            }
         }
-        return ok
+    }
+
+    /** Escrituras a Firestore solo con la cuenta abierta y sin borrado en curso. */
+    private fun cloudActive(uid: String): Boolean {
+        val current = user ?: return false
+        return !current.isGuest && current.uid == uid && !scoreQueue.isPaused(uid)
+    }
+
+    /** Lanza una escritura a la nube y la registra para que el borrado de cuenta la espere. */
+    private fun launchCloudWrite(block: suspend CoroutineScope.() -> Unit): Job {
+        cloudJobs.removeAll { it.isCompleted }
+        val job = sessionScope.launch(block = block)
+        cloudJobs.add(job)
+        return job
+    }
+
+    private suspend fun settleCloudWork() {
+        flushJob?.join()
+        cloudJobs.toList().forEach { it.join() }
+        cloudJobs.removeAll { it.isCompleted }
+    }
+
+    fun openDeleteAccount() {
+        accountDeletionError = null
+        showDeleteAccountDialog = true
+    }
+
+    fun dismissDeleteAccount() {
+        if (deletingAccount) return
+        showDeleteAccountDialog = false
+        accountDeletionError = null
+    }
+
+    /**
+     * Borrado de cuenta (Play): verificar identidad con Google, pausar subidas, borrar datos en la
+     * nube y el usuario de Auth, limpiar datos locales de la cuenta y volver a invitado.
+     * Si se corta, queda pendiente y se reanuda con otro intento.
+     */
+    fun deleteAccount() {
+        val current = user?.takeIf { !it.isGuest } ?: return
+        if (deletingAccount) return
+        val repository = platformAccountDeletion()
+        if (repository == null) {
+            accountDeletionError = strings.accountDeletionUnavailable
+            return
+        }
+        val uid = current.uid
+        val controller = AccountDeletionController(repository, preferences, scoreQueue)
+        deletingAccount = true
+        accountDeletionError = null
+        sessionScope.launch {
+            val outcome = runCatching { controller.erase(uid) { settleCloudWork() } }
+            deletingAccount = false
+            outcome.onSuccess {
+                showDeleteAccountDialog = false
+                signOutToGuest()
+                ranking = null
+                accountNotice = strings.accountDeleted
+                screen = Screen.Profile
+            }.onFailure { error ->
+                val pendingNow = controller.isPending(uid)
+                if (user?.uid == uid) accountDeletionPending = pendingNow
+                val code = (error as? AccountDeletionException)?.error
+                accountDeletionError = when {
+                    code == AccountDeletionError.Cancelled && !pendingNow -> null
+                    pendingNow -> strings.accountDeletionError
+                    code == AccountDeletionError.WrongAccount -> strings.accountDeletionWrongAccount
+                    code == AccountDeletionError.Network -> strings.accountDeletionNetwork
+                    code == AccountDeletionError.Unsupported -> strings.accountDeletionUnavailable
+                    else -> strings.accountDeletionVerifyFailed
+                }
+            }
+        }
+    }
+
+    fun selectGameCombi(micro: Micro) {
+        gameCombi = micro
+        preferences.saveGameCombi(micro.name)
+    }
+
+    fun openLink(url: String) {
+        linkError = if (platformOpenUrl(url)) null else strings.openLinkFailed
     }
 
     private fun rememberRecentTrip() {

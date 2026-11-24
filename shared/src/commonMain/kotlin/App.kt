@@ -26,6 +26,8 @@ import pe.edu.tecsup.gowayki.ui.screens.GameScreen
 import pe.edu.tecsup.gowayki.ui.screens.HelpScreen
 import pe.edu.tecsup.gowayki.ui.screens.HomeScreen
 import pe.edu.tecsup.gowayki.ui.screens.LinesScreen
+import pe.edu.tecsup.gowayki.ui.screens.LocationDisclosureScreen
+import pe.edu.tecsup.gowayki.domain.legal.LegalLinks
 import pe.edu.tecsup.gowayki.ui.screens.OnboardingScreen
 import pe.edu.tecsup.gowayki.ui.screens.ProfileScreen
 import pe.edu.tecsup.gowayki.ui.screens.RankingScreen
@@ -45,6 +47,7 @@ data class GowaykiRuntime(
     val cityPackProvider: (() -> CityPackRepository?)? = null,
     val preferences: PreferencesRepository = InMemoryPreferencesRepository(),
     val initialSignedIn: pe.edu.tecsup.gowayki.domain.auth.SignedInUser? = null,
+    val legalLinks: LegalLinks = LegalLinks(),
 )
 
 private var runtimeHolder: GowaykiRuntime = GowaykiRuntime()
@@ -65,6 +68,7 @@ fun App() {
             deviceLanguage = runtimeHolder.deviceLanguage,
             startAsGuest = runtimeHolder.initialSignedIn == null,
             initialSignedIn = runtimeHolder.initialSignedIn,
+            legalLinks = runtimeHolder.legalLinks,
         )
     }
     GowaykiTheme(reduceMotion = session.reduceMotion) {
@@ -102,6 +106,7 @@ fun App() {
                 Screen.Auth -> AuthScreen(session)
                 Screen.ActiveTrip -> ActiveTripScreen(session)
                 Screen.Lines -> LinesScreen(session)
+                Screen.LocationDisclosure -> LocationDisclosureScreen(session)
             }
         }
         }

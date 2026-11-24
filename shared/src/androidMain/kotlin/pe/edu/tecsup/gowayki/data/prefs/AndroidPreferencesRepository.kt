@@ -76,16 +76,55 @@ class AndroidPreferencesRepository(context: Context) : PreferencesRepository {
         prefs.edit().putString(KEY_RECENTS, trips.joinToString("\n") { it.encode() }).apply()
     }
 
-    override fun readPendingScores(): List<String> =
-        prefs.getString(KEY_PENDING_SCORES, null)
+    override fun readPendingScores(uid: String): List<String> =
+        prefs.getString(pendingScoresKey(uid), null)
             ?.lineSequence()
             ?.filter { it.isNotBlank() }
             ?.toList()
             .orEmpty()
 
-    override fun savePendingScores(lines: List<String>) {
-        prefs.edit().putString(KEY_PENDING_SCORES, lines.joinToString("\n")).apply()
+    override fun savePendingScores(uid: String, lines: List<String>) {
+        val edit = prefs.edit()
+        if (lines.isEmpty()) {
+            edit.remove(pendingScoresKey(uid))
+        } else {
+            edit.putString(pendingScoresKey(uid), lines.joinToString("\n"))
+        }
+        edit.apply()
     }
+
+    override fun hasLegacyPendingScores(): Boolean = prefs.contains(KEY_LEGACY_PENDING_SCORES)
+
+    override fun discardLegacyPendingScores() {
+        prefs.edit().remove(KEY_LEGACY_PENDING_SCORES).apply()
+    }
+
+    override fun readLocationDisclosureAccepted(): Boolean =
+        prefs.getBoolean(KEY_LOCATION_DISCLOSURE, false)
+
+    override fun saveLocationDisclosureAccepted(accepted: Boolean) {
+        prefs.edit().putBoolean(KEY_LOCATION_DISCLOSURE, accepted).apply()
+    }
+
+    override fun readAccountsBeingDeleted(): Set<String> =
+        prefs.getStringSet(KEY_ACCOUNTS_DELETING, null)?.toSet().orEmpty()
+
+    /** `commit` y no `apply`: la pausa debe quedar en disco antes de tocar la nube. */
+    override fun saveAccountBeingDeleted(uid: String, deleting: Boolean) {
+        val next = readAccountsBeingDeleted().toMutableSet()
+        if (deleting) next.add(uid) else next.remove(uid)
+        check(prefs.edit().putStringSet(KEY_ACCOUNTS_DELETING, next).commit()) {
+            "No se pudo guardar el estado de borrado."
+        }
+    }
+
+    override fun readGameCombi(): String? = prefs.getString(KEY_GAME_COMBI, null)
+
+    override fun saveGameCombi(name: String) {
+        prefs.edit().putString(KEY_GAME_COMBI, name).apply()
+    }
+
+    private fun pendingScoresKey(uid: String): String = "$KEY_PENDING_SCORES_PREFIX$uid"
 
     companion object {
         private const val KEY_CITY = "city_code"
@@ -97,6 +136,11 @@ class AndroidPreferencesRepository(context: Context) : PreferencesRepository {
         private const val KEY_ALARM = "alarm_mode"
         private const val KEY_FAVORITES = "favorites"
         private const val KEY_RECENTS = "recents"
-        private const val KEY_PENDING_SCORES = "pending_scores"
+        /** Cola compartida (sin uid) de versiones anteriores; se descarta al arrancar. */
+        private const val KEY_LEGACY_PENDING_SCORES = "pending_scores"
+        private const val KEY_PENDING_SCORES_PREFIX = "pending_scores.v2."
+        private const val KEY_LOCATION_DISCLOSURE = "location_disclosure_accepted"
+        private const val KEY_ACCOUNTS_DELETING = "accounts_deleting"
+        private const val KEY_GAME_COMBI = "game_combi"
     }
 }
