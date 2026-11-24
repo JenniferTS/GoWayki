@@ -32,7 +32,7 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
         if (segments.isNotEmpty()) {
             segments.forEach { seg ->
                 val color = when (seg.kind) {
-                    RouteKind.Walk -> Color(0xFF5C6B73)
+                    RouteKind.Walk -> GowaykiColors.Walk
                     RouteKind.Transit -> GowaykiColors.BrandOrange
                 }
                 val effect = if (seg.kind == RouteKind.Walk) PathEffect.dashPathEffect(floatArrayOf(12f, 10f)) else null
@@ -56,6 +56,6 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                 )
             }
         }
-        overlay.user?.let { drawCircle(Color(0xFF1E88E5), radius = 10f, center = map(it)) }
+        overlay.user?.let { drawCircle(GowaykiColors.UserDot, radius = 10f, center = map(it)) }
     }
 }

@@ -24,7 +24,6 @@ data class Strings(
     val errorGeneric: String,
     val offline: String,
     val fareEstimated: String,
-    val minutesApprox: String,
     val walking: String,
     val transfers: String,
     val communityDisclaimer: String,
@@ -39,7 +38,6 @@ data class Strings(
     val reportPickMap: String,
     val reportWithdraw: String,
     val nearbyReports: String,
-    val tutorialStepOf: String,
     val tutorial1: String,
     val tutorial2: String,
     val tutorial3: String,
@@ -98,9 +96,7 @@ data class Strings(
     val locationDisabled: String,
     val linesExplorer: String,
     val favorites: String,
-    val recentTrips: String,
     val addFavorite: String,
-    val confirmReport: String,
     val alreadyConfirmed: String,
     val scoreSavedOffline: String,
     val retryScores: String,
@@ -111,7 +107,89 @@ data class Strings(
     val boardAt: String,
     val alightAt: String,
     val walkStraightHint: String,
-)
+    val splashTagline: String,
+    val navigateBack: String,
+    val start: String,
+    val preparingCity: String,
+    val mapUnavailable: String,
+    val reportMissingStop: String,
+    val reportStopName: String,
+    val reportLineMissing: String,
+    val reportType: String,
+    val reportSent: String,
+    val reportSendError: String,
+    val reportValidation: String,
+    val reportNeedsAccount: String,
+    val reportLifetime: String,
+    val reportLocationSet: String,
+    val rankingUnavailable: String,
+    val rankingEmpty: String,
+    val rankingOwn: String,
+    val rankingSignIn: String,
+    val linesEmpty: String,
+    val routeDetail: String,
+    val walkMeters: String,
+    val walkingMinutes: String,
+    val minutesShort: String,
+    val noTransfers: String,
+    val oneTransfer: String,
+    val manyTransfers: String,
+    val signInGoogleDemo: String,
+    val authHelp: String,
+    val authGoogleError: String,
+    val guestEntry: String,
+    val signedInAs: String,
+    val systemDefault: String,
+    val tripNotificationTitle: String,
+    val tripNotificationBody: String,
+    val tripChannelName: String,
+    val gameChooseCombi: String,
+    val helpBody: String,
+    val demoRoute: String,
+    val locationTitle: String,
+    val homeExplore: String,
+    val tutorialStep: String,
+    val fareAmount: String,
+    val removeFavorite: String,
+    val stopsRemainingCount: String,
+    val remainingDistance: String,
+    val searchExamples: String,
+    val pendingScoresCount: String,
+    val theme: String,
+    val communityTitle: String,
+) {
+    fun format(template: String, vararg args: Any): String {
+        var out = template
+        args.forEachIndexed { index, arg ->
+            out = out.replace("%${index + 1}\$s", arg.toString())
+        }
+        return if (args.isNotEmpty()) out.replace("%s", args.first().toString()) else out
+    }
+
+    fun walkMeters(meters: Int): String = format(walkMeters, meters)
+
+    fun walkingMinutes(minutes: Int): String = format(walkingMinutes, minutes)
+
+    fun minutes(minutes: Int): String = format(minutesShort, minutes)
+
+    fun transfersCount(count: Int): String = when (count) {
+        0 -> noTransfers
+        1 -> oneTransfer
+        else -> format(manyTransfers, count)
+    }
+
+    fun rankingOwn(position: Int, score: Int): String = format(rankingOwn, position, score)
+
+    fun reportKind(kind: pe.edu.tecsup.gowayki.domain.community.ReportKind): String = when (kind) {
+        pe.edu.tecsup.gowayki.domain.community.ReportKind.HeavyTraffic -> reportHeavyTraffic
+        pe.edu.tecsup.gowayki.domain.community.ReportKind.Detour -> reportDetour
+        pe.edu.tecsup.gowayki.domain.community.ReportKind.RoadBlocked -> reportRoadBlocked
+        pe.edu.tecsup.gowayki.domain.community.ReportKind.Other -> reportOther
+        pe.edu.tecsup.gowayki.domain.community.ReportKind.MissingStop -> reportMissingStop
+        pe.edu.tecsup.gowayki.domain.community.ReportKind.StopName -> reportStopName
+        pe.edu.tecsup.gowayki.domain.community.ReportKind.LineMissing -> reportLineMissing
+    }
+}
 
 object StringCatalog {
     private val es = Strings(
@@ -136,7 +214,6 @@ object StringCatalog {
         errorGeneric = "Algo salió mal. Inténtalo de nuevo.",
         offline = "Sin conexión. Puedes seguir con el mapa y las rutas offline.",
         fareEstimated = "Pasaje estimado",
-        minutesApprox = "min aprox.",
         walking = "caminata",
         transfers = "transbordos",
         communityDisclaimer = "Información de la comunidad, no verificada por gowayki go.",
@@ -151,7 +228,6 @@ object StringCatalog {
         reportPickMap = "Elegir en el mapa",
         reportWithdraw = "Retirar mi reporte",
         nearbyReports = "Cerca de ti",
-        tutorialStepOf = "de",
         tutorial1 = "Empieza aquí: busca tu destino.",
         tutorial2 = "Aquí puedes consultar las rutas disponibles.",
         tutorial3 = "Desde aquí puedes avisar de tráfico o desvíos.",
@@ -210,9 +286,7 @@ object StringCatalog {
         locationDisabled = "El GPS está apagado. Actívalo en Ajustes para usar tu ubicación.",
         linesExplorer = "Líneas",
         favorites = "Favoritos",
-        recentTrips = "Recientes",
         addFavorite = "Guardar destino",
-        confirmReport = "Confirmar",
         alreadyConfirmed = "Ya confirmaste este reporte.",
         scoreSavedOffline = "Puntaje guardado offline; se publicará al conectar.",
         retryScores = "Reintentar puntajes",
@@ -223,6 +297,56 @@ object StringCatalog {
         boardAt = "Sube en",
         alightAt = "Baja en",
         walkStraightHint = "Camina hacia el paradero (ruta peatonal estimada).",
+        splashTagline = "Arequipa · rutas con criterio",
+        navigateBack = "Volver",
+        start = "Comenzar",
+        preparingCity = "Preparando Arequipa…",
+        mapUnavailable = "No se pudo cargar el mapa sin conexión.",
+        reportMissingStop = "El paradero no existe",
+        reportStopName = "Nombre del paradero incorrecto o ausente",
+        reportLineMissing = "La línea ya no pasa",
+        reportType = "Tipo de problema",
+        reportSent = "Reporte enviado.",
+        reportSendError = "No se pudo confirmar el envío. Conservamos el texto para que vuelvas a intentarlo.",
+        reportValidation = "Describe el problema con entre 3 y 500 caracteres.",
+        reportNeedsAccount = "Inicia sesión con Google para reportar y confirmar.",
+        reportLifetime = "Los reportes se muestran durante 72 horas.",
+        reportLocationSet = "Ubicación del reporte: %s",
+        rankingUnavailable = "No se pudo cargar el ranking. Vuelve a intentarlo con conexión.",
+        rankingEmpty = "Aún no hay puntajes publicados esta semana.",
+        rankingOwn = "Tu puesto: %1\$s · %2\$s puntos",
+        rankingSignIn = "Inicia sesión para publicar tus puntajes en el ranking.",
+        linesEmpty = "No hay líneas en el paquete actual.",
+        routeDetail = "Detalle de la ruta",
+        walkMeters = "Camina %s m",
+        walkingMinutes = "Caminata: ~%s min",
+        minutesShort = "~%s min",
+        noTransfers = "Sin transbordo",
+        oneTransfer = "1 transbordo",
+        manyTransfers = "%s transbordos",
+        signInGoogleDemo = "Continuar con Google (demo)",
+        authHelp = "Usa tu cuenta o continúa como invitado. Puedes planificar rutas sin iniciar sesión.",
+        authGoogleError = "No pudimos iniciar sesión con Google. Inténtalo de nuevo.",
+        guestEntry = "Continuar como invitado",
+        signedInAs = "Sesión iniciada como %s",
+        systemDefault = "Sistema",
+        tripNotificationTitle = "gowayki go · Viaje en curso",
+        tripNotificationBody = "Te avisamos antes de bajar.",
+        tripChannelName = "Viaje en curso",
+        gameChooseCombi = "Elige tu combi",
+        helpBody = "Busca tu destino, compara rutas con tiempos aproximados y sigue el viaje paso a paso. El pasaje y los tiempos son estimados.",
+        demoRoute = "Ejemplo: Plaza de Armas → TECSUP",
+        locationTitle = "Ubicación",
+        homeExplore = "Explorar",
+        tutorialStep = "Paso %1\$s de %2\$s",
+        fareAmount = "Pasaje estimado: %s",
+        removeFavorite = "Quitar de favoritos",
+        stopsRemainingCount = "Paraderos restantes: ~%s",
+        remainingDistance = "Distancia al siguiente punto: ~%s m",
+        searchExamples = "Prueba “TECSUP”, “Plaza” o “Mall”",
+        pendingScoresCount = "Puntajes pendientes de publicar: %s",
+        theme = "Tema",
+        communityTitle = "Reportes de la comunidad",
     )
 
     private val en = Strings(
@@ -247,7 +371,6 @@ object StringCatalog {
         errorGeneric = "Something went wrong. Try again.",
         offline = "You are offline. Offline map and routes still work.",
         fareEstimated = "Estimated fare",
-        minutesApprox = "min approx.",
         walking = "walking",
         transfers = "transfers",
         communityDisclaimer = "Community information, not verified by gowayki go.",
@@ -262,7 +385,6 @@ object StringCatalog {
         reportPickMap = "Pick on map",
         reportWithdraw = "Withdraw my report",
         nearbyReports = "Near you",
-        tutorialStepOf = "of",
         tutorial1 = "Start here: search your destination.",
         tutorial2 = "Here you can browse available routes.",
         tutorial3 = "From here you can report traffic or detours.",
@@ -321,9 +443,7 @@ object StringCatalog {
         locationDisabled = "GPS is off. Enable it in Settings to use your location.",
         linesExplorer = "Lines",
         favorites = "Favorites",
-        recentTrips = "Recent",
         addFavorite = "Save destination",
-        confirmReport = "Confirm",
         alreadyConfirmed = "You already confirmed this report.",
         scoreSavedOffline = "Score saved offline; it will publish when online.",
         retryScores = "Retry scores",
@@ -334,10 +454,63 @@ object StringCatalog {
         boardAt = "Board at",
         alightAt = "Alight at",
         walkStraightHint = "Walk to the stop (estimated pedestrian path).",
+        splashTagline = "Arequipa · routes that make sense",
+        navigateBack = "Back",
+        start = "Get started",
+        preparingCity = "Preparing Arequipa…",
+        mapUnavailable = "The offline map could not be loaded.",
+        reportMissingStop = "Stop does not exist",
+        reportStopName = "Incorrect or missing stop name",
+        reportLineMissing = "Line no longer serves here",
+        reportType = "Problem type",
+        reportSent = "Report submitted.",
+        reportSendError = "Could not confirm submission. Your text is still here so you can retry.",
+        reportValidation = "Describe the problem using 3 to 500 characters.",
+        reportNeedsAccount = "Sign in with Google to report and confirm.",
+        reportLifetime = "Reports remain visible for 72 hours.",
+        reportLocationSet = "Report location: %s",
+        rankingUnavailable = "Could not load the ranking. Try again with a connection.",
+        rankingEmpty = "No scores have been published this week yet.",
+        rankingOwn = "Your position: %1\$s · %2\$s points",
+        rankingSignIn = "Sign in to publish your scores to the ranking.",
+        linesEmpty = "There are no lines in the current data package.",
+        routeDetail = "Route details",
+        walkMeters = "Walk %s m",
+        walkingMinutes = "Walk: ~%s min",
+        minutesShort = "~%s min",
+        noTransfers = "No transfers",
+        oneTransfer = "1 transfer",
+        manyTransfers = "%s transfers",
+        signInGoogleDemo = "Continue with Google (demo)",
+        authHelp = "Use your account or continue as a guest. You can plan routes without signing in.",
+        authGoogleError = "We couldn't sign you in with Google. Please try again.",
+        guestEntry = "Continue as guest",
+        signedInAs = "Signed in as %s",
+        systemDefault = "System",
+        tripNotificationTitle = "gowayki go · Trip in progress",
+        tripNotificationBody = "We'll alert you before your stop.",
+        tripChannelName = "Trip in progress",
+        gameChooseCombi = "Pick your combi",
+        helpBody = "Search your destination, compare routes with approximate times and follow your trip step by step. Fares and times are estimates.",
+        demoRoute = "Example: Plaza de Armas → TECSUP",
+        locationTitle = "Location",
+        homeExplore = "Explore",
+        tutorialStep = "Step %1\$s of %2\$s",
+        fareAmount = "Estimated fare: %s",
+        removeFavorite = "Remove from favorites",
+        stopsRemainingCount = "Stops left: ~%s",
+        remainingDistance = "Distance to next point: ~%s m",
+        searchExamples = "Try “TECSUP”, “Plaza” or “Mall”",
+        pendingScoresCount = "Scores waiting to be published: %s",
+        theme = "Theme",
+        communityTitle = "Community reports",
     )
 
     fun forLocale(locale: AppLocale): Strings = when (locale) {
         AppLocale.Es -> es
         AppLocale.En -> en
     }
+
+    /** Textos del idioma activo para código fuera de Compose (notificaciones del servicio de viaje). */
+    var current: Strings = es
 }

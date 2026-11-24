@@ -12,8 +12,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +22,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -45,11 +46,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import pe.edu.tecsup.gowayki.domain.planner.Itinerary
 import pe.edu.tecsup.gowayki.domain.planner.TransitLeg
 import pe.edu.tecsup.gowayki.domain.planner.WalkLeg
 import pe.edu.tecsup.gowayki.platform.HapticKind
@@ -61,15 +64,22 @@ import pe.edu.tecsup.gowayki.ui.components.JourneySheet
 import pe.edu.tecsup.gowayki.ui.components.JourneySheetSnap
 import pe.edu.tecsup.gowayki.ui.components.PrimaryButton
 import pe.edu.tecsup.gowayki.ui.components.StaggerIn
+import pe.edu.tecsup.gowayki.ui.components.StepRow
 import pe.edu.tecsup.gowayki.ui.components.mapPaddingDp
+import pe.edu.tecsup.gowayki.ui.components.parseLineColor
 import pe.edu.tecsup.gowayki.ui.map.CityMap
 import pe.edu.tecsup.gowayki.ui.map.MapOverlay
 import pe.edu.tecsup.gowayki.ui.map.itineraryEndpoints
 import pe.edu.tecsup.gowayki.ui.map.itinerarySegments
 import pe.edu.tecsup.gowayki.ui.map.itineraryStops
-import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
-import pe.edu.tecsup.gowayki.ui.theme.GowaykiFonts
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiElevation
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiMotion
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiRadius
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiSize
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiSpace
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiStroke
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiTheme
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiType
 import pe.edu.tecsup.gowayki.ui.theme.LocalMotionPrefs
 
 /**
@@ -80,6 +90,7 @@ import pe.edu.tecsup.gowayki.ui.theme.LocalMotionPrefs
 @Composable
 fun MapsJourneyScreen(session: AppSession) {
     val s = session.strings
+    val colors = GowaykiTheme.colors
     val reduce = LocalMotionPrefs.current.reduceMotion
     val list = session.journey?.itineraries.orEmpty()
     val planKey = remember(session.journey) {
@@ -104,24 +115,10 @@ fun MapsJourneyScreen(session: AppSession) {
 
     val selected = session.selectedItineraryIndex.coerceIn(0, (list.size - 1).coerceAtLeast(0))
     val trip = list.getOrNull(selected)
-    val segments = remember(trip) { itinerarySegments(trip) }
-    val stops = remember(trip) { itineraryStops(trip) }
-    val ends = remember(trip) { itineraryEndpoints(trip) }
     val padBottom = sheetSnap.mapPaddingDp()
 
-    Box(Modifier.fillMaxSize().background(GowaykiColors.Mist)) {
-        CityMap(
-            modifier = Modifier.fillMaxSize(),
-            overlay = MapOverlay(
-                segments = segments,
-                stops = stops,
-                markers = ends,
-                user = session.lastKnownLocation,
-                zoom = 13.2,
-                followEpoch = session.locationFollowEpoch,
-                fitPaddingBottomDp = padBottom,
-            ),
-        )
+    Box(Modifier.fillMaxSize().background(colors.background)) {
+        JourneyMap(session, trip, padBottom)
 
         AnimatedVisibility(
             visible = chromeVisible,
@@ -132,34 +129,34 @@ fun MapsJourneyScreen(session: AppSession) {
                     initialOffsetY = { if (reduce) 0 else -28 },
                 ),
         ) {
+            val shape = RoundedCornerShape(GowaykiRadius.lg)
             Surface(
                 modifier = Modifier
-                    .padding(top = 18.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = GowaykiSpace.md, start = GowaykiSpace.md, end = GowaykiSpace.md)
                     .fillMaxWidth()
-                    .shadow(10.dp, RoundedCornerShape(28.dp))
+                    .shadow(GowaykiElevation.panel, shape, spotColor = colors.shadow)
                     .semantics { contentDescription = "${session.originLabel} → ${session.destinationLabel}" },
-                shape = RoundedCornerShape(28.dp),
-                color = Color.White,
-                elevation = 0.dp,
+                shape = shape,
+                color = colors.surfaceElevated,
+                contentColor = colors.onSurface,
+                elevation = GowaykiElevation.none,
             ) {
-                Column(Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            GowaykiIcons.Back,
-                            contentDescription = s.back,
-                            tint = GowaykiColors.BrandInk,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .clickable { session.go(Screen.Search) }
-                                .padding(2.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f).clickable { session.go(Screen.Search) }) {
-                            EndpointRow(color = Color(0xFF34A853), label = session.originLabel.ifBlank { s.searchOrigin })
-                            Spacer(Modifier.height(8.dp))
-                            EndpointRow(color = Color(0xFFEA4335), label = session.destinationLabel.ifBlank { s.searchDestination })
-                        }
+                Row(Modifier.padding(GowaykiSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(GowaykiSize.touchTarget)
+                            .clip(CircleShape)
+                            .clickable(role = Role.Button) { session.go(Screen.Search) }
+                            .semantics { contentDescription = s.navigateBack },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(GowaykiIcons.Back, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(GowaykiSize.icon))
+                    }
+                    Spacer(Modifier.width(GowaykiSpace.xs))
+                    Column(Modifier.weight(1f).clickable(role = Role.Button) { session.go(Screen.Search) }) {
+                        EndpointRow(color = colors.origin, label = session.originLabel.ifBlank { s.searchOrigin })
+                        Spacer(Modifier.height(GowaykiSpace.sm))
+                        EndpointRow(color = colors.destination, label = session.destinationLabel.ifBlank { s.searchDestination })
                     }
                 }
             }
@@ -168,33 +165,34 @@ fun MapsJourneyScreen(session: AppSession) {
         Box(
             Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = (padBottom + 12).dp)
-                .size(48.dp)
-                .shadow(8.dp, CircleShape)
+                .padding(end = GowaykiSpace.md, bottom = (padBottom + 12).dp)
+                .size(GowaykiSize.touchTarget)
+                .shadow(GowaykiElevation.card, CircleShape)
                 .clip(CircleShape)
-                .background(Color.White)
-                .clickable { session.recenterOnUser() },
+                .background(colors.surfaceElevated)
+                .clickable(role = Role.Button) { session.recenterOnUser() }
+                .semantics { contentDescription = s.myLocation },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(GowaykiIcons.Location, contentDescription = s.myLocation, tint = GowaykiColors.BrandOrange, modifier = Modifier.size(22.dp))
+            Icon(GowaykiIcons.Location, contentDescription = null, tint = colors.primary, modifier = Modifier.size(GowaykiSize.icon))
         }
 
         session.locationMessage?.let { msg ->
-            AnimatedVisibility(
-                visible = true,
+            Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 96.dp, start = 24.dp, end = 24.dp),
-                enter = fadeIn(GowaykiMotion.soft()) + slideInVertically { -12 },
+                    .padding(top = 112.dp, start = GowaykiSpace.lg, end = GowaykiSpace.lg),
+                shape = RoundedCornerShape(GowaykiRadius.sm),
+                color = colors.surfaceElevated,
+                contentColor = colors.onSurface,
+                elevation = GowaykiElevation.card,
             ) {
-                Surface(shape = RoundedCornerShape(14.dp), color = Color.White, elevation = 6.dp) {
-                    Text(
-                        msg,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.caption,
-                        color = GowaykiColors.BrandInk,
-                    )
-                }
+                Text(
+                    msg,
+                    modifier = Modifier.padding(horizontal = GowaykiSpace.md, vertical = GowaykiSpace.smd),
+                    style = MaterialTheme.typography.caption,
+                    color = colors.onSurface,
+                )
             }
         }
 
@@ -205,27 +203,22 @@ fun MapsJourneyScreen(session: AppSession) {
         ) { snap ->
             if (list.isEmpty()) {
                 Text(session.planError ?: s.emptyRoutes, style = MaterialTheme.typography.body2)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(GowaykiSpace.sm))
                 PrimaryButton(s.retry, onClick = { session.go(Screen.Search) })
                 return@JourneySheet
             }
 
-            val chipsScroll = rememberScrollState()
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(chipsScroll),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            LazyRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GowaykiSpace.sm),
             ) {
-                list.forEachIndexed { index, option ->
+                itemsIndexed(list, key = { index, _ -> "$planKey#$index" }) { index, option ->
                     StaggerIn(index = index, enterKey = planKey) {
                         RouteOptionChip(
-                            minutes = option.durationMinutes.toInt(),
-                            walking = option.walkingMinutes.toInt(),
-                            fare = session.formatFare(option.estimatedFare),
+                            minutes = s.minutes(option.durationMinutes.toInt()),
+                            detail = "${s.walkingMinutes(option.walkingMinutes.toInt())} · ${session.formatFare(option.estimatedFare)}",
                             lines = option.legs.filterIsInstance<TransitLeg>().joinToString(" · ") { it.lineName }
                                 .ifBlank { s.walking },
-                            walkingLabel = s.walking,
                             selected = index == selected,
                             onClick = {
                                 if (index != session.selectedItineraryIndex) {
@@ -239,7 +232,7 @@ fun MapsJourneyScreen(session: AppSession) {
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(GowaykiSpace.smd))
 
             AnimatedContent(
                 targetState = selected,
@@ -256,30 +249,31 @@ fun MapsJourneyScreen(session: AppSession) {
                 val current = list.getOrNull(idx)
                 if (current != null) {
                     Column {
+                        Text(s.minutes(current.durationMinutes.toInt()), style = MaterialTheme.typography.h5)
                         Text(
-                            "${current.durationMinutes.toInt()} ${s.minutesApprox}",
-                            style = MaterialTheme.typography.h5,
-                            fontFamily = GowaykiFonts.Primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            "${s.walking}: ${current.walkingMinutes.toInt()} min · ${s.transfers}: ${current.transfers} · ${s.fareEstimated}: ${session.formatFare(current.estimatedFare)}",
+                            "${s.walkingMinutes(current.walkingMinutes.toInt())} · ${s.transfersCount(current.transfers)} · ${s.format(s.fareAmount, session.formatFare(current.estimatedFare))}",
                             style = MaterialTheme.typography.body2,
-                            color = GowaykiColors.Stone,
                         )
                     }
                 }
             }
 
             if (snap != JourneySheetSnap.Peek && trip != null) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    s.stepByStep,
-                    style = MaterialTheme.typography.subtitle1,
-                    fontFamily = GowaykiFonts.Secondary,
-                )
-                Spacer(Modifier.height(8.dp))
-                val stepsMax = if (snap == JourneySheetSnap.Full) 280.dp else 140.dp
+                Spacer(Modifier.height(GowaykiSpace.smd))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(s.stepByStep, style = MaterialTheme.typography.subtitle1, modifier = Modifier.weight(1f))
+                    Text(
+                        s.viewDetail,
+                        style = MaterialTheme.typography.button,
+                        color = colors.primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(GowaykiRadius.pill))
+                            .clickable(role = Role.Button) { session.openDetail(selected) }
+                            .padding(horizontal = GowaykiSpace.sm, vertical = GowaykiSpace.xs),
+                    )
+                }
+                Spacer(Modifier.height(GowaykiSpace.sm))
+                val stepsMax: Dp = if (snap == JourneySheetSnap.Full) 280.dp else 120.dp
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -289,12 +283,12 @@ fun MapsJourneyScreen(session: AppSession) {
                     trip.legs.forEachIndexed { i, leg ->
                         when (leg) {
                             is WalkLeg -> StepRow(
-                                iconTint = Color(0xFF5C6B73),
-                                title = "${s.walking} ${leg.meters.toInt()} m",
+                                iconTint = colors.walk,
+                                title = s.walkMeters(leg.meters.toInt()),
                                 subtitle = s.walkStraightHint,
                             )
                             is TransitLeg -> StepRow(
-                                iconTint = parseColor(leg.color),
+                                iconTint = parseLineColor(leg.color, colors.primary),
                                 title = "${s.takeLine} ${leg.lineName} → ${leg.headsign}",
                                 subtitle = "${s.boardAt} ${leg.boardingStop.name} · ${s.alightAt} ${leg.alightingStop.name}",
                             )
@@ -302,17 +296,17 @@ fun MapsJourneyScreen(session: AppSession) {
                         if (i < trip.legs.lastIndex) {
                             Box(
                                 Modifier
-                                    .padding(start = 15.dp)
-                                    .width(2.dp)
-                                    .height(10.dp)
-                                    .background(GowaykiColors.Outline),
+                                    .padding(start = GowaykiSpace.xs)
+                                    .width(GowaykiStroke.strong)
+                                    .height(GowaykiSpace.smd)
+                                    .background(colors.outline),
                             )
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(GowaykiSpace.smd))
             PrimaryButton(
                 text = s.startTrip,
                 onClick = {
@@ -325,23 +319,42 @@ fun MapsJourneyScreen(session: AppSession) {
     }
 }
 
+/** Mapa del recorrido; lee la ubicación aquí para no recomponer la hoja con cada fix. */
+@Composable
+private fun JourneyMap(session: AppSession, trip: Itinerary?, padBottom: Int) {
+    val segments = remember(trip) { itinerarySegments(trip) }
+    val stops = remember(trip) { itineraryStops(trip) }
+    val ends = remember(trip) { itineraryEndpoints(trip) }
+    CityMap(
+        modifier = Modifier.fillMaxSize(),
+        overlay = MapOverlay(
+            segments = segments,
+            stops = stops,
+            markers = ends,
+            user = session.lastKnownLocation,
+            zoom = 13.2,
+            followEpoch = session.locationFollowEpoch,
+            fitPaddingBottomDp = padBottom,
+        ),
+    )
+}
+
 @Composable
 private fun RouteOptionChip(
-    minutes: Int,
-    walking: Int,
-    fare: String,
+    minutes: String,
+    detail: String,
     lines: String,
-    walkingLabel: String,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = GowaykiTheme.colors
     val borderColor by animateColorAsState(
-        if (selected) GowaykiColors.BrandOrange else GowaykiColors.Outline,
+        if (selected) colors.primary else colors.outline,
         animationSpec = GowaykiMotion.selection(),
         label = "chipBorder",
     )
     val bg by animateColorAsState(
-        if (selected) GowaykiColors.BrandOrange.copy(alpha = 0.12f) else GowaykiColors.Mist,
+        if (selected) colors.primarySoft else colors.surfaceSunken,
         animationSpec = GowaykiMotion.selection(),
         label = "chipBg",
     )
@@ -350,89 +363,36 @@ private fun RouteOptionChip(
         animationSpec = GowaykiMotion.selection(),
         label = "chipScale",
     )
+    val shape = RoundedCornerShape(GowaykiRadius.md)
     Column(
         Modifier
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(bg)
-            .border(width = if (selected) 2.dp else 1.dp, color = borderColor, shape = RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-            .semantics { contentDescription = "$minutes min · $lines" },
+            .border(width = if (selected) GowaykiStroke.strong else GowaykiStroke.hairline, color = borderColor, shape = shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = GowaykiSpace.md, vertical = GowaykiSpace.smd)
+            .semantics { contentDescription = "$minutes · $lines" },
     ) {
-        Text(
-            "$minutes min",
-            style = MaterialTheme.typography.subtitle1,
-            fontFamily = GowaykiFonts.Secondary,
-            fontWeight = FontWeight.Black,
-            color = if (selected) GowaykiColors.BrandOrange else GowaykiColors.BrandInk,
-            fontSize = 18.sp,
-        )
-        Text(
-            "$walking min $walkingLabel · $fare",
-            style = MaterialTheme.typography.caption,
-            color = GowaykiColors.Stone,
-        )
-        Text(
-            lines,
-            style = MaterialTheme.typography.body2,
-            fontFamily = GowaykiFonts.Primary,
-            fontWeight = FontWeight.Medium,
-            color = GowaykiColors.BrandInk,
-        )
+        Text(minutes, style = GowaykiType.metric, color = if (selected) colors.primary else colors.onSurface)
+        Text(detail, style = MaterialTheme.typography.caption)
+        Text(lines, style = MaterialTheme.typography.subtitle2, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
 private fun EndpointRow(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(10.dp))
+        Box(Modifier.size(GowaykiSize.dot).clip(CircleShape).background(color))
+        Spacer(Modifier.width(GowaykiSpace.smd))
         Text(
             label,
-            style = MaterialTheme.typography.subtitle1,
-            fontFamily = GowaykiFonts.Primary,
-            fontWeight = FontWeight.Medium,
-            color = GowaykiColors.BrandInk,
+            style = MaterialTheme.typography.subtitle2,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
-}
-
-@Composable
-private fun StepRow(iconTint: Color, title: String, subtitle: String) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Box(
-            Modifier
-                .padding(top = 4.dp)
-                .size(12.dp)
-                .clip(CircleShape)
-                .background(iconTint),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(
-                title,
-                style = MaterialTheme.typography.subtitle1,
-                fontFamily = GowaykiFonts.Secondary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(subtitle, style = MaterialTheme.typography.caption, color = GowaykiColors.Stone)
-        }
-    }
-}
-
-private fun parseColor(hex: String): Color {
-    val t = hex.trim().removePrefix("#")
-    return runCatching {
-        Color(("FF$t").toLong(16))
-    }.getOrDefault(GowaykiColors.BrandOrange)
 }
