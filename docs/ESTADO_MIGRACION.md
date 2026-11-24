@@ -23,7 +23,11 @@ Original Flutter intacto: `~/workspace/gowayki-lab-respaldo` @ `31fbe31`
 | Baseline Profiles | Implementado |
 | UI brand + botones pill con press/shimmer | Implementado |
 | iOS shell | Docs + stubs (Mac) |
-| Ilustraciones micros en APK | **No** (a propósito, peso) |
+| Ilustraciones micros en APK (15 webp, onboarding + juego, decodificadas reducidas) | Implementado |
+| i18n es/en completo (idioma del sistema por defecto, elegible y persistido) | Implementado |
+| Tema por tokens + modo oscuro (UI y mapa) | Implementado |
+| Arranque/sesión sin bloquear el hilo de UI (Firestore en segundo plano) | Implementado |
+| R8 (minify + shrinkResources) en release/benchmark | Implementado |
 
 ## Versión
 

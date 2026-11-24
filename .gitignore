@@ -18,3 +18,12 @@ tool/firebase/node_modules/
 .config/
 **/gowayki-lab-sa.json
 **/*adminsdk*.json
+
+# release signing (nunca en git)
+keystore.properties
+*.jks
+*.p12
+*.keystore
+
+# volcados de la JVM al quedarse sin memoria
+hs_err_pid*.log

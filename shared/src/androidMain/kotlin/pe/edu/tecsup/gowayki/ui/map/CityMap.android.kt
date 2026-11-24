@@ -15,10 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
@@ -33,7 +36,11 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import pe.edu.tecsup.gowayki.data.map.OfflineMapInstaller
 import pe.edu.tecsup.gowayki.domain.planner.GeoPoint
+import pe.edu.tecsup.gowayki.ui.LocalStrings
 import pe.edu.tecsup.gowayki.ui.theme.GowaykiColors
+import pe.edu.tecsup.gowayki.ui.theme.GowaykiTheme
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.material.MaterialTheme
 import java.io.File
 import kotlin.math.abs
 
@@ -45,25 +52,29 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     val fitHolder = remember { FitKeyHolder() }
 
-    LaunchedEffect(Unit) {
+    val dark = GowaykiTheme.colors.isDark
+    LaunchedEffect(dark) {
         runCatching {
             MapLibre.getInstance(context.applicationContext)
-            styleFile = OfflineMapInstaller(context).installStyle(dark = false)
+            styleFile = withContext(Dispatchers.IO) {
+                OfflineMapInstaller(context.applicationContext).installStyle(dark = dark)
+            }
         }.onFailure { error = it.message ?: "mapa" }
     }
 
     Box(modifier) {
         if (error != null) {
             Text(
-                "Mapa offline no disponible",
-                color = GowaykiColors.Stone,
+                LocalStrings.current.mapUnavailable,
+                style = MaterialTheme.typography.body2,
+                color = GowaykiTheme.colors.onSurfaceMuted,
                 modifier = Modifier.align(Alignment.Center),
             )
         } else if (styleFile != null) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    MapView(ctx).also { view ->
+                    MapView(ctx, MapLibreMapOptions.createFromAttributes(ctx).textureMode(true)).also { view ->
                         mapViewRef = view
                         view.onCreate(null)
                         view.onStart()
@@ -72,7 +83,9 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                             map.uiSettings.isCompassEnabled = true
                             map.uiSettings.isAttributionEnabled = false
                             map.uiSettings.isLogoEnabled = false
-                            map.setStyle(Style.Builder().fromUri(styleFile!!.toURI().toString())) { style ->
+                            val uri = "file://" + styleFile!!.absolutePath
+                            fitHolder.styleUri = uri
+                            map.setStyle(Style.Builder().fromUri(uri)) { style ->
                                 runCatching {
                                     ensureSources(style)
                                     fitHolder.key = applyOverlay(
@@ -82,6 +95,7 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                                         fitHolder.key,
                                         forceFit = true,
                                         density = view.resources.displayMetrics.density,
+                                        viewHeightPx = view.height,
                                     )
                                 }
                             }
@@ -89,7 +103,26 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                     }
                 },
                 update = { view ->
+                    val uri = "file://" + styleFile!!.absolutePath
                     view.getMapAsync { map ->
+                        if (fitHolder.styleUri != null && fitHolder.styleUri != uri) {
+                            fitHolder.styleUri = uri
+                            map.setStyle(Style.Builder().fromUri(uri)) { style ->
+                                runCatching {
+                                    ensureSources(style)
+                                    fitHolder.key = applyOverlay(
+                                        style,
+                                        map,
+                                        overlay,
+                                        fitHolder.key,
+                                        forceFit = true,
+                                        density = view.resources.displayMetrics.density,
+                                        viewHeightPx = view.height,
+                                    )
+                                }
+                            }
+                            return@getMapAsync
+                        }
                         map.getStyle { style ->
                             runCatching {
                                 ensureSources(style)
@@ -100,6 +133,7 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
                                     fitHolder.key,
                                     forceFit = false,
                                     density = view.resources.displayMetrics.density,
+                                    viewHeightPx = view.height,
                                 )
                             }.onFailure {
                                 // No tumbar la Activity si el estilo aún no está listo o la cota es inválida.
@@ -126,7 +160,7 @@ actual fun CityMap(modifier: Modifier, overlay: MapOverlay) {
     }
 }
 
-private class FitKeyHolder(var key: String = "")
+private class FitKeyHolder(var key: String = "", var styleUri: String? = null)
 
 private const val WALK_SOURCE = "gowayki-walk"
 private const val WALK_LAYER = "gowayki-walk-line"
@@ -150,7 +184,7 @@ private fun ensureSources(style: Style) {
         style.addSource(GeoJsonSource(WALK_SOURCE))
         style.addLayer(
             LineLayer(WALK_LAYER, WALK_SOURCE).withProperties(
-                PropertyFactory.lineColor(AndroidColor.parseColor("#5C6B73")),
+                PropertyFactory.lineColor(GowaykiColors.Walk.toArgb()),
                 PropertyFactory.lineWidth(4.5f),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
@@ -183,7 +217,7 @@ private fun ensureSources(style: Style) {
         style.addSource(GeoJsonSource(ROUTE_SOURCE))
         style.addLayer(
             LineLayer(ROUTE_CASING, ROUTE_SOURCE).withProperties(
-                PropertyFactory.lineColor(AndroidColor.parseColor("#FFFFFF")),
+                PropertyFactory.lineColor(AndroidColor.WHITE),
                 PropertyFactory.lineWidth(10f),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
@@ -192,7 +226,7 @@ private fun ensureSources(style: Style) {
         )
         style.addLayer(
             LineLayer(ROUTE_LAYER, ROUTE_SOURCE).withProperties(
-                PropertyFactory.lineColor(AndroidColor.parseColor("#F05709")),
+                PropertyFactory.lineColor(GowaykiColors.BrandOrange.toArgb()),
                 PropertyFactory.lineWidth(5.5f),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
@@ -204,7 +238,7 @@ private fun ensureSources(style: Style) {
         style.addLayer(
             CircleLayer(STOP_LAYER, STOP_SOURCE).withProperties(
                 PropertyFactory.circleRadius(4.5f),
-                PropertyFactory.circleColor(AndroidColor.parseColor("#5C6B73")),
+                PropertyFactory.circleColor(GowaykiColors.Walk.toArgb()),
                 PropertyFactory.circleStrokeWidth(1.2f),
                 PropertyFactory.circleStrokeColor(AndroidColor.WHITE),
                 PropertyFactory.circleOpacity(0.85f),
@@ -216,7 +250,7 @@ private fun ensureSources(style: Style) {
         style.addLayer(
             CircleLayer(MARKER_LAYER, MARKER_SOURCE).withProperties(
                 PropertyFactory.circleRadius(7.5f),
-                PropertyFactory.circleColor(AndroidColor.parseColor("#C47A1A")),
+                PropertyFactory.circleColor(GowaykiColors.MapStop.toArgb()),
                 PropertyFactory.circleStrokeWidth(2f),
                 PropertyFactory.circleStrokeColor(AndroidColor.WHITE),
             ),
@@ -238,7 +272,7 @@ private fun ensureSources(style: Style) {
         style.addLayer(
             CircleLayer(USER_LAYER, USER_SOURCE).withProperties(
                 PropertyFactory.circleRadius(9f),
-                PropertyFactory.circleColor(AndroidColor.parseColor("#1E88E5")),
+                PropertyFactory.circleColor(GowaykiColors.UserDot.toArgb()),
                 PropertyFactory.circleStrokeWidth(3f),
                 PropertyFactory.circleStrokeColor(AndroidColor.WHITE),
             ),
@@ -279,6 +313,7 @@ private fun applyOverlay(
     previousFitKey: String,
     forceFit: Boolean,
     density: Float,
+    viewHeightPx: Int,
 ): String {
     val segments = overlay.segments
     val fallbackRoute = dedupeNearby(overlay.route)
@@ -358,9 +393,11 @@ private fun applyOverlay(
         (overlay.camera?.let { "${it.latitude},${it.longitude}" } ?: "") +
         "|${overlay.zoom}|fu=${overlay.followEpoch}|pb=${overlay.fitPaddingBottomDp}"
     if (forceFit || fitKey != previousFitKey) {
-        val bottomPad = ((overlay.fitPaddingBottomDp.takeIf { it > 0 } ?: 72) * density).toInt()
-        val side = (48 * density).toInt()
-        val top = (96 * density).toInt()
+        val maxVertical = if (viewHeightPx > 0) viewHeightPx * 0.2f else Float.MAX_VALUE
+        val bottomPad = overlay.fitPaddingBottomDp.takeIf { it > 0 }?.let { (it * density).toInt() }
+            ?: (72 * density).coerceAtMost(maxVertical).toInt()
+        val side = (32 * density).toInt()
+        val top = (96 * density).coerceAtMost(maxVertical).toInt()
         val prevFollow = Regex("""\|fu=(\d+)""").find(previousFitKey)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
         val followUser = overlay.followEpoch > 0L && overlay.user != null &&
             overlay.followEpoch != prevFollow

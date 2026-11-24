@@ -15,3 +15,7 @@ actual fun launchPlatformGoogleSignIn(
         launch()
     }
 }
+
+actual fun signOutPlatformGoogle() {
+    GoogleSignInBridge.signOut?.invoke()
+}

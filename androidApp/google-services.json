@@ -22,6 +22,22 @@
           }
         },
         {
+          "client_id": "959294066022-3e4f6fjmpcdqdass3eobn0ljqlveadkg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "pe.edu.tecsup.gowayki_lab",
+            "certificate_hash": "4c2b52d0a6cd68b4741151da338b310a5af2eb26"
+          }
+        },
+        {
+          "client_id": "959294066022-3tdl1qocghhcjpeblk3b64hnar8ueb0b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "pe.edu.tecsup.gowayki_lab",
+            "certificate_hash": "1fa25286c02fe2cc683aed1ec46f5fcf16c7ac07"
+          }
+        },
+        {
           "client_id": "959294066022-7vtsv24d6k2ag2h4q0tfn1foc6joagmf.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
