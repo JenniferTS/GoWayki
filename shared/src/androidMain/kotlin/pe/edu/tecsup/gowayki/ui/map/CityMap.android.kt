@@ -414,7 +414,7 @@ private fun applyOverlay(
             overlay.followEpoch != prevFollow
         when {
             followUser -> {
-                val u = overlay.user!!
+                val u = overlay.user
                 map.easeCamera(
                     CameraUpdateFactory.newLatLngZoom(LatLng(u.latitude, u.longitude), 15.6),
                     420,

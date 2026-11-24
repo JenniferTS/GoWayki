@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -112,7 +113,12 @@ fun OnboardingScreen(session: AppSession) {
             .background(Brush.verticalGradient(listOf(page.soft, colors.backgroundAlt, colors.background))),
     ) {
         FloatingBlobs(accent = page.accent, reduce = reduce)
-        Column(Modifier.fillMaxSize().padding(horizontal = GowaykiSpace.mdl, vertical = GowaykiSpace.smd)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(horizontal = GowaykiSpace.mdl, vertical = GowaykiSpace.smd),
+        ) {
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

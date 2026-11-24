@@ -1,6 +1,6 @@
 # GoWayki iOS (shell KMP)
 
-El framework Compose Multiplatform vive en `:shared` (`iosArm64` / `iosSimulatorArm64` / `iosX64`).  
+El framework Compose Multiplatform vive en `:shared` (`iosArm64` / `iosSimulatorArm64`; `iosX64`, el simulador en Mac Intel, se quitó porque Compose Multiplatform 1.11+ ya no lo publica).  
 **Este servidor es Linux:** no hay Xcode; el binario iOS se genera en una Mac.
 
 ## Requisitos (Mac)

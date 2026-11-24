@@ -3,11 +3,15 @@ package pe.edu.tecsup.gowayki.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +44,7 @@ enum class JourneySheetSnap { Peek, Mid, Full }
 /**
  * Panel inferior con snapeos claros (peek / mid / full).
  * El gesto vertical acompaña; al soltar asienta con spring controlado.
+ * La superficie se extiende detrás de la barra de navegación del sistema; el contenido queda encima.
  */
 @Composable
 fun JourneySheet(
@@ -67,7 +72,8 @@ fun JourneySheet(
         if (reduce) heightPx.snapTo(target)
         else heightPx.animateTo(target, GowaykiMotion.panel())
     }
-    val currentDp = with(density) { heightPx.value.toDp() }
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val currentDp = with(density) { heightPx.value.toDp() } + navBottom
     val colors = GowaykiTheme.colors
     val sheetShape = RoundedCornerShape(topStart = GowaykiRadius.lg, topEnd = GowaykiRadius.lg)
 
@@ -81,7 +87,7 @@ fun JourneySheet(
         contentColor = colors.onSurface,
         elevation = GowaykiElevation.none,
     ) {
-        Column(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
             Box(
                 Modifier
                     .fillMaxWidth()
