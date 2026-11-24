@@ -31,7 +31,7 @@ kotlin {
                 implementation("org.jetbrains.compose.runtime:runtime:$composeVersion")
                 implementation("org.jetbrains.compose.foundation:foundation:$composeVersion")
                 implementation("org.jetbrains.compose.material:material:$composeVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
             }
         }
         commonTest {
@@ -41,18 +41,18 @@ kotlin {
         }
         androidMain {
             dependencies {
-                api("androidx.activity:activity-compose:1.7.2")
-                api("androidx.appcompat:appcompat:1.6.1")
-                api("androidx.core:core-ktx:1.10.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-                implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
+                api("androidx.activity:activity-compose:1.13.0")
+                api("androidx.appcompat:appcompat:1.8.0")
+                api("androidx.core:core-ktx:1.18.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+                implementation(project.dependencies.platform("com.google.firebase:firebase-bom:35.2.0"))
                 implementation("com.google.firebase:firebase-auth")
                 implementation("com.google.firebase:firebase-firestore")
-                implementation("androidx.credentials:credentials:1.3.0")
-                implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-                implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
-                implementation("com.google.android.gms:play-services-location:21.3.0")
-                implementation("org.maplibre.gl:android-sdk:11.5.2")
+                implementation("androidx.credentials:credentials:1.6.0")
+                implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+                implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
+                implementation("com.google.android.gms:play-services-location:21.4.0")
+                implementation("org.maplibre.gl:android-sdk-opengl:13.7.1")
             }
         }
     }

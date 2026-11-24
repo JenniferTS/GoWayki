@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -112,7 +114,7 @@ fun SplashScreen(session: AppSession) {
     LaunchedEffect(Unit) { session.bootstrap() }
     AtmosphereBackground {
         Column(
-            Modifier.fillMaxSize().padding(GowaykiSpace.lg),
+            Modifier.fillMaxSize().systemBarsPadding().padding(GowaykiSpace.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -300,6 +302,8 @@ fun TutorialOverlay(session: AppSession) {
     val colors = GowaykiTheme.colors
     val messages = listOf(s.tutorial1, s.tutorial2, s.tutorial3, s.tutorial4)
     val step = session.tutorial.step.coerceIn(0, 3)
+    // El velo va en la ventana principal (de borde a borde): la ventana del Popup no cubre las barras del sistema.
+    Box(Modifier.fillMaxSize().background(colors.scrim))
     Popup(
         alignment = Alignment.Center,
         properties = PopupProperties(focusable = true, dismissOnBackPress = false, dismissOnClickOutside = false),
@@ -307,7 +311,6 @@ fun TutorialOverlay(session: AppSession) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(colors.scrim)
             .clickable(enabled = true, onClick = {}),
     ) {
         GlassPanel(modifier = Modifier.align(Alignment.Center).padding(GowaykiSpace.md).fillMaxWidth()) {
@@ -345,6 +348,9 @@ fun SearchScreen(session: AppSession) {
             if (session.journey?.itineraries?.isNotEmpty() == true) session.go(Screen.Results)
             else session.go(Screen.Home)
         },
+        // La flecha vuelve a Resultados, y Resultados vuelve aquí: el Atrás del sistema sube a Inicio
+        // para no quedar en un ciclo Buscar ↔ Resultados.
+        systemBack = { session.go(Screen.Home) },
         modifier = Modifier.imePadding(),
     ) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -585,6 +591,7 @@ fun ReportsScreen(session: AppSession) {
             message = s.reportSent,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(GowaykiSpace.md)
                 .fillMaxWidth(),
         )
@@ -644,6 +651,7 @@ private fun DeleteAccountDialog(session: AppSession) {
     val s = session.strings
     val colors = GowaykiTheme.colors
     val busy = session.deletingAccount
+    Box(Modifier.fillMaxSize().background(colors.scrim))
     Popup(
         alignment = Alignment.Center,
         onDismissRequest = { session.dismissDeleteAccount() },
@@ -652,7 +660,6 @@ private fun DeleteAccountDialog(session: AppSession) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(colors.scrim)
                 .clickable(enabled = true, onClick = {}),
         ) {
             GlassPanel(
@@ -970,6 +977,7 @@ fun AuthScreen(session: AppSession) {
             Column(
                 Modifier
                     .fillMaxSize()
+                    .systemBarsPadding()
                     .verticalScroll(rememberScrollState())
                     .padding(GowaykiSpace.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
