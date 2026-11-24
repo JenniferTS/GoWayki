@@ -1,5 +1,6 @@
 package pe.edu.tecsup.gowayki.platform
 
+import pe.edu.tecsup.gowayki.domain.account.AccountDeletionRepository
 import pe.edu.tecsup.gowayki.domain.community.RemoteReportsClient
 import pe.edu.tecsup.gowayki.domain.game.RankingClient
 import pe.edu.tecsup.gowayki.domain.preferences.OnboardingStatus
@@ -32,7 +33,21 @@ expect fun platformRanking(): RankingClient?
 expect fun platformLastLocation(): PlatformLocation?
 /** Lectura fresca (Fused getCurrentLocation); async. */
 expect fun platformFetchCurrentLocation(onResult: (PlatformLocation?) -> Unit)
+/**
+ * Abre el diálogo del sistema. Solo [pe.edu.tecsup.gowayki.ui.AppSession] lo llama, después del
+ * aviso de ubicación aceptado (política de divulgación destacada de Play).
+ */
 expect fun platformRequestLocationPermission(onResult: (Boolean) -> Unit)
+/** Consulta sin pedir nada. */
+expect fun platformHasLocationPermission(): Boolean
+/** Permiso de notificaciones (Android 13+) para las alertas del viaje activo; true si no aplica. */
+expect fun platformRequestNotificationPermission(onResult: (Boolean) -> Unit)
+/** Ajustes de la app, para reactivar un permiso denegado de forma permanente. */
+expect fun platformOpenAppSettings(): Boolean
+/** Abre [url] en el navegador; false si no hay quien la abra. */
+expect fun platformOpenUrl(url: String): Boolean
+/** Borrado de cuenta en el backend; null si la plataforma no lo soporta todavía. */
+expect fun platformAccountDeletion(): AccountDeletionRepository?
 expect fun platformIsLocationEnabled(): Boolean
 expect fun platformTripAlert(title: String, body: String, mode: AlarmMode)
 expect fun platformClearTripNotifications()

@@ -57,7 +57,8 @@ class AndroidFirebaseAuthRepository(
         }
     }
 
-    private suspend fun requestGoogleIdToken(): String {
+    /** idToken de Google vía Credential Manager (inicio de sesión y reverificación antes de borrar la cuenta). */
+    suspend fun requestGoogleIdToken(): String {
         val option = GetSignInWithGoogleOption.Builder(webClientId).build()
         val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
         val credential = try {

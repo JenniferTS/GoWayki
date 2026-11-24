@@ -411,6 +411,37 @@ fun SoftButton(
     }
 }
 
+/** Acción destructiva e irreversible (eliminar cuenta): borde y texto en el color de error. */
+@Composable
+fun DangerButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val colors = GowaykiTheme.colors
+    val shape = RoundedCornerShape(GowaykiRadius.pill)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = GowaykiSize.softButtonHeight)
+            .clip(shape)
+            .background(colors.surfaceElevated)
+            .border(GowaykiStroke.strong, if (enabled) colors.error else colors.disabled, shape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = if (enabled) colors.error else colors.onDisabled,
+            style = MaterialTheme.typography.button,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = GowaykiSpace.smd, vertical = GowaykiSpace.sm),
+        )
+    }
+}
+
 /** Fila de opciones exclusivas (idioma, alarma…) que marca la elegida. */
 @Composable
 fun <T> ChoiceRow(

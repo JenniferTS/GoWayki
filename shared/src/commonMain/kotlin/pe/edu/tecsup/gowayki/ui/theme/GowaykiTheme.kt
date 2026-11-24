@@ -105,9 +105,15 @@ data class GowaykiPalette(
     val illustrationCard: Color,
     val illustrationSoft: Color,
     val illustrationLine: Color,
-    val gameSkyTop: Color,
-    val gameSkyBottom: Color,
-    val gameObstacle: Color,
+    /** Pista de Wayki Combi: asfalto, bordes, líneas de carril, berma y baches. */
+    val gameRoad: Color,
+    val gameRoadEdge: Color,
+    val gameLaneMark: Color,
+    val gameVerge: Color,
+    val gameVergeDetail: Color,
+    val gamePothole: Color,
+    val gamePotholeRim: Color,
+    val gameCrack: Color,
     val onboardingSoft: List<Color>,
 )
 
@@ -149,9 +155,14 @@ private val LightPalette = GowaykiPalette(
     illustrationCard = Color.White,
     illustrationSoft = Color(0xFFFFF7F2),
     illustrationLine = GowaykiColors.Outline,
-    gameSkyTop = Color(0xFF1A2E26),
-    gameSkyBottom = Color(0xFF0F1A16),
-    gameObstacle = Color(0xFFE9D8C2),
+    gameRoad = Color(0xFF4A4744),
+    gameRoadEdge = Color(0xFFF7F1EA),
+    gameLaneMark = Color(0xFFF6D46A),
+    gameVerge = Color(0xFFD9B48A),
+    gameVergeDetail = Color(0xFFB98F64),
+    gamePothole = Color(0xFF1C1A19),
+    gamePotholeRim = Color(0xFF77706A),
+    gameCrack = Color(0xFF2B2826),
     onboardingSoft = listOf(Color(0xFFFFE0CC), Color(0xFFFFF0D6), Color(0xFFD6E8F8)),
 )
 
@@ -193,9 +204,14 @@ private val DarkPalette = GowaykiPalette(
     illustrationCard = Color(0xFF2A2726),
     illustrationSoft = Color(0xFF332D2A),
     illustrationLine = Color(0xFF4A403A),
-    gameSkyTop = Color(0xFF1A2E26),
-    gameSkyBottom = Color(0xFF0F1A16),
-    gameObstacle = Color(0xFFE9D8C2),
+    gameRoad = Color(0xFF2F2D2C),
+    gameRoadEdge = Color(0xFFBDB3AC),
+    gameLaneMark = Color(0xFFD9B54A),
+    gameVerge = Color(0xFF4A3B2C),
+    gameVergeDetail = Color(0xFF6A5440),
+    gamePothole = Color(0xFF0D0C0C),
+    gamePotholeRim = Color(0xFF5E5852),
+    gameCrack = Color(0xFF161514),
     onboardingSoft = listOf(Color(0xFF3A2416), Color(0xFF3A2C14), Color(0xFF15283A)),
 )
 
@@ -212,7 +228,10 @@ object GowaykiMotion {
     const val AmbientSlowMs = 3200
     const val BounceMs = 1600
     const val WobbleMs = 2200
-    const val GameTickMs = 32
+    /** Cambio de carril en Wayki Combi. */
+    const val GameLaneChangeMs = 140
+    /** Un hueco mayor entre cuadros significa app en segundo plano: el juego se pausa. */
+    const val GamePauseGapMs = 250L
 
     fun <T> soft() = tween<T>(TransitionMs, easing = FastOutSlowInEasing)
     fun <T> micro() = tween<T>(MicroMs, easing = FastOutSlowInEasing)
@@ -304,8 +323,8 @@ object GowaykiSize {
     val searchHits = 220.dp
     val onboardingHero = 300.dp
     val microThumb = 64.dp
-    val gameBoard = 320.dp
-    val comboPicker = 72.dp
+    val gameTrack = 236.dp
+    val gamePicker = 64.dp
 }
 
 data class MotionPrefs(val reduceMotion: Boolean = false)
