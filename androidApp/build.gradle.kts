@@ -22,6 +22,8 @@ kotlin {
                 implementation("com.google.android.gms:play-services-location:21.4.0")
                 implementation("org.maplibre.gl:android-sdk-opengl:13.7.1")
                 implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+                implementation("androidx.glance:glance-appwidget:1.1.1")
+                implementation("androidx.glance:glance-material3:1.1.1")
             }
         }
     }
