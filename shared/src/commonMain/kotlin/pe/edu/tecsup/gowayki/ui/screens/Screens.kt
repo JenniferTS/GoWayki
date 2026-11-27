@@ -68,7 +68,9 @@ import pe.edu.tecsup.gowayki.domain.planner.GeoPoint
 import pe.edu.tecsup.gowayki.domain.planner.TransitLeg
 import pe.edu.tecsup.gowayki.domain.planner.WalkLeg
 import pe.edu.tecsup.gowayki.domain.preferences.AppLocale
+import pe.edu.tecsup.gowayki.domain.preferences.ThemePreference
 import pe.edu.tecsup.gowayki.domain.tracking.TripPhase
+import pe.edu.tecsup.gowayki.i18n.extraStrings
 import pe.edu.tecsup.gowayki.platform.AlarmMode
 import pe.edu.tecsup.gowayki.platform.HapticKind
 import pe.edu.tecsup.gowayki.platform.platformHaptic
@@ -727,6 +729,17 @@ fun SettingsScreen(session: AppSession) {
                 ),
                 selected = session.alarmMode,
                 onSelect = { session.setAlarm(it) },
+            )
+            val extra = extraStrings(session.locale == AppLocale.Es)
+            SectionTitle(extra.themeTitle)
+            ChoiceRow(
+                options = listOf(
+                    ThemePreference.System to extra.themeSystem,
+                    ThemePreference.Light to extra.themeLight,
+                    ThemePreference.Dark to extra.themeDark,
+                ),
+                selected = session.themePreference,
+                onSelect = { session.updateTheme(it) },
             )
             Spacer(Modifier.height(GowaykiSpace.mdl))
             GlassPanel(Modifier.fillMaxWidth(), onClick = { session.reduceMotion = !session.reduceMotion }) {

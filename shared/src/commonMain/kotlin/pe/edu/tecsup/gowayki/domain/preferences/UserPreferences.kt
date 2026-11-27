@@ -184,6 +184,10 @@ interface PreferencesRepository {
     /** Combi elegida en Wayki Combi (nombre del enum `Micro`). */
     fun readGameCombi(): String?
     fun saveGameCombi(name: String)
+
+    /** Tema elegido en Ajustes (sistema, claro u oscuro). */
+    fun readThemePreference(): ThemePreference
+    fun saveThemePreference(theme: ThemePreference)
     fun locale(deviceLanguage: String?): AppLocale = AppLocale.resolve(readLocaleCode(), deviceLanguage)
 }
 
@@ -201,6 +205,7 @@ class InMemoryPreferencesRepository : PreferencesRepository {
     private var locationDisclosureAccepted = false
     private val accountsBeingDeleted = mutableSetOf<String>()
     private var gameCombi: String? = null
+    private var themePreference: ThemePreference = ThemePreference.System
 
     override fun readCityCode(): String? = cityCode
 
@@ -267,6 +272,11 @@ class InMemoryPreferencesRepository : PreferencesRepository {
     override fun readGameCombi(): String? = gameCombi
     override fun saveGameCombi(name: String) {
         gameCombi = name
+    }
+
+    override fun readThemePreference(): ThemePreference = themePreference
+    override fun saveThemePreference(theme: ThemePreference) {
+        themePreference = theme
     }
 
     override fun readAccountsBeingDeleted(): Set<String> = accountsBeingDeleted.toSet()
