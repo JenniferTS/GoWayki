@@ -5,6 +5,7 @@ import pe.edu.tecsup.gowayki.domain.preferences.OnboardingStatus
 import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
 import pe.edu.tecsup.gowayki.domain.preferences.RecentTrip
 import pe.edu.tecsup.gowayki.domain.preferences.SavedPlace
+import pe.edu.tecsup.gowayki.domain.preferences.ThemePreference
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialProgress
 
 class AndroidPreferencesRepository(context: Context) : PreferencesRepository {
@@ -124,6 +125,13 @@ class AndroidPreferencesRepository(context: Context) : PreferencesRepository {
         prefs.edit().putString(KEY_GAME_COMBI, name).apply()
     }
 
+    override fun readThemePreference(): ThemePreference =
+        ThemePreference.fromStorage(prefs.getString(KEY_THEME, null))
+
+    override fun saveThemePreference(theme: ThemePreference) {
+        prefs.edit().putString(KEY_THEME, theme.storageValue).apply()
+    }
+
     private fun pendingScoresKey(uid: String): String = "$KEY_PENDING_SCORES_PREFIX$uid"
 
     companion object {
@@ -142,5 +150,6 @@ class AndroidPreferencesRepository(context: Context) : PreferencesRepository {
         private const val KEY_LOCATION_DISCLOSURE = "location_disclosure_accepted"
         private const val KEY_ACCOUNTS_DELETING = "accounts_deleting"
         private const val KEY_GAME_COMBI = "game_combi"
+        private const val KEY_THEME = "theme_preference"
     }
 }

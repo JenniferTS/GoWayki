@@ -2,6 +2,7 @@ package pe.edu.tecsup.gowayki.i18n
 
 /** Cadenas nuevas del lote de mejoras (ES/EN). */
 data class ExtraStrings(
+    val themeTitle: String,
     val themeSystem: String,
     val themeLight: String,
     val themeDark: String,
@@ -23,6 +24,7 @@ data class ExtraStrings(
 )
 
 fun extraStrings(es: Boolean): ExtraStrings = if (es) ExtraStrings(
+    themeTitle = "Tema",
     themeSystem = "Según el sistema",
     themeLight = "Claro",
     themeDark = "Oscuro",
@@ -42,6 +44,7 @@ fun extraStrings(es: Boolean): ExtraStrings = if (es) ExtraStrings(
     shareLine = "Compartir línea",
     darkMap = "Mapa oscuro",
 ) else ExtraStrings(
+    themeTitle = "Theme",
     themeSystem = "System default",
     themeLight = "Light",
     themeDark = "Dark",
