@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_search_short">Buscar viaje</string>
+    <string name="shortcut_search_long">Buscar un viaje en gowayki go</string>
+    <string name="shortcut_favorite_short">Favorito</string>
+    <string name="shortcut_favorite_long">Abrir último destino favorito</string>
+    <string name="pin_shortcut">Agregar a inicio</string>
+</resources>
