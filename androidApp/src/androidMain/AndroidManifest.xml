@@ -53,14 +53,7 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/next_trip_widget_info" />
         </receiver>
-        <receiver
-            android:name="pe.edu.tecsup.gowayki.platform.TripActionReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="pe.edu.tecsup.gowayki.action.FINISH_TRIP" />
-                <action android:name="pe.edu.tecsup.gowayki.action.MUTE_ALARM" />
-            </intent-filter>
-        </receiver>
+        
     </application>
 
 </manifest>
