@@ -65,6 +65,7 @@ import pe.edu.tecsup.gowayki.platform.SystemBackHandler
 import pe.edu.tecsup.gowayki.platform.platformHaptic
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
+import pe.edu.tecsup.gowayki.ui.a11y.A11yLabels
 import pe.edu.tecsup.gowayki.ui.components.GowaykiIcons
 import pe.edu.tecsup.gowayki.ui.components.JourneySheet
 import pe.edu.tecsup.gowayki.ui.components.JourneySheetSnap
@@ -181,7 +182,7 @@ fun MapsJourneyScreen(session: AppSession) {
                 .clip(CircleShape)
                 .background(colors.surfaceElevated)
                 .clickable(role = Role.Button) { session.recenterOnUser() }
-                .semantics { contentDescription = s.myLocation },
+                .semantics { contentDescription = A11yLabels.FAB_MY_LOCATION },
             contentAlignment = Alignment.Center,
         ) {
             Icon(GowaykiIcons.Location, contentDescription = null, tint = colors.primary, modifier = Modifier.size(GowaykiSize.icon))

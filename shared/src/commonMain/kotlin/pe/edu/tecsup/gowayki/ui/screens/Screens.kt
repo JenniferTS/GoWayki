@@ -76,6 +76,7 @@ import pe.edu.tecsup.gowayki.platform.HapticKind
 import pe.edu.tecsup.gowayki.platform.platformHaptic
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
+import pe.edu.tecsup.gowayki.ui.a11y.A11yLabels
 import pe.edu.tecsup.gowayki.ui.components.ActionConfirmBanner
 import pe.edu.tecsup.gowayki.ui.components.AtmosphereBackground
 import pe.edu.tecsup.gowayki.ui.components.BottomNavBar
@@ -146,10 +147,10 @@ fun HomeScreen(session: AppSession) {
             bottomBar = {
                 BottomNavBar(
                     items = listOf(
-                        NavItem(s.homeExplore, GowaykiIcons.Routes) { session.go(Screen.Home) },
-                        NavItem(s.linesExplorer, GowaykiIcons.Lines) { session.go(Screen.Lines) },
-                        NavItem(s.homeReport, GowaykiIcons.Report) { session.go(Screen.Reports) },
-                        NavItem(s.homeProfile, GowaykiIcons.Profile) { session.go(Screen.Profile) },
+                        NavItem(s.homeExplore, GowaykiIcons.Routes, A11yLabels.NAV_HOME) { session.go(Screen.Home) },
+                        NavItem(s.linesExplorer, GowaykiIcons.Lines, A11yLabels.NAV_SEARCH) { session.go(Screen.Lines) },
+                        NavItem(s.homeReport, GowaykiIcons.Report, A11yLabels.NAV_REPORTS) { session.go(Screen.Reports) },
+                        NavItem(s.homeProfile, GowaykiIcons.Profile, A11yLabels.NAV_PROFILE) { session.go(Screen.Profile) },
                     ),
                     activeIndex = 0,
                 )
@@ -188,7 +189,7 @@ fun HomeScreen(session: AppSession) {
                         .clip(CircleShape)
                         .background(colors.surfaceElevated)
                         .clickable(role = Role.Button) { session.recenterOnUser() }
-                        .semantics { contentDescription = s.myLocation },
+                        .semantics { contentDescription = A11yLabels.FAB_MY_LOCATION },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(GowaykiIcons.Location, contentDescription = null, tint = colors.primary, modifier = Modifier.size(GowaykiSize.icon))
