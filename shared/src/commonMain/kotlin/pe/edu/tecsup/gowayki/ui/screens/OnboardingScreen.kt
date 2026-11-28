@@ -55,7 +55,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
+import pe.edu.tecsup.gowayki.domain.onboarding.NO_LIVE_GPS_SLIDE
 import pe.edu.tecsup.gowayki.domain.preferences.AppLocale
+import pe.edu.tecsup.gowayki.i18n.ExtraStrings
+import pe.edu.tecsup.gowayki.i18n.extraStrings
 import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.components.BrandLogo
 import pe.edu.tecsup.gowayki.ui.components.GowaykiIcons
@@ -82,7 +85,15 @@ private data class OnboardPage(
 )
 
 /** Como en Flutter: cada página muestra una combi grande y cuatro pequeñas (micros[page * 5 + i]). */
-private fun microsForPage(page: Int): List<Micro> = Micro.entries.drop(page * 5).take(5)
+private fun microsForPage(page: Int): List<Micro> =
+    Micro.entries.drop(page * 5).take(5).ifEmpty { Micro.entries.take(5) }
+
+/** Texto del slide [NO_LIVE_GPS_SLIDE]: sus claves apuntan a [ExtraStrings]. */
+private fun slideText(key: String, extra: ExtraStrings): String = when (key) {
+    "noLiveGpsTitle" -> extra.noLiveGpsTitle
+    "noLiveGpsBody" -> extra.noLiveGpsBody
+    else -> key
+}
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -90,12 +101,22 @@ fun OnboardingScreen(session: AppSession) {
     val s = session.strings
     val colors = GowaykiTheme.colors
     val reduce = LocalMotionPrefs.current.reduceMotion
-    val step = session.onboardingStep.coerceIn(0, 2)
+    val extra = extraStrings(session.locale == AppLocale.Es)
     val pages = listOf(
         OnboardPage(s.onboardingTitle1, s.onboardingBody1, colors.primary, colors.primaryStrong, colors.onboardingSoft[0], GowaykiIcons.Routes),
         OnboardPage(s.onboardingTitle2, s.onboardingBody2, colors.accent, colors.primary, colors.onboardingSoft[1], GowaykiIcons.Bus),
         OnboardPage(s.onboardingTitle3, s.onboardingBody3, colors.transitOutbound, colors.transitOutboundDeep, colors.onboardingSoft[2], GowaykiIcons.Report),
+        OnboardPage(
+            slideText(NO_LIVE_GPS_SLIDE.titleKey, extra),
+            slideText(NO_LIVE_GPS_SLIDE.bodyKey, extra),
+            colors.accent,
+            colors.primary,
+            colors.onboardingSoft[1],
+            GowaykiIcons.Bus,
+        ),
     )
+    val lastStep = pages.lastIndex
+    val step = session.onboardingStep.coerceIn(0, lastStep)
     val page = pages[step]
     val heroScale = remember { Animatable(0.86f) }
     LaunchedEffect(step) {
@@ -139,7 +160,7 @@ fun OnboardingScreen(session: AppSession) {
             }
 
             Spacer(Modifier.height(GowaykiSpace.sm))
-            StepPips(step = step, total = 3, accent = page.accent)
+            StepPips(step = step, total = pages.size, accent = page.accent)
             Spacer(Modifier.height(GowaykiSpace.smd))
 
             BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
@@ -217,9 +238,9 @@ fun OnboardingScreen(session: AppSession) {
                     )
                 }
                 PrimaryButton(
-                    text = if (step >= 2) s.start else s.next,
+                    text = if (step >= lastStep) s.start else s.next,
                     onClick = {
-                        if (step >= 2) session.finishOnboarding(false) else session.onboardingStep = step + 1
+                        if (step >= lastStep) session.finishOnboarding(false) else session.onboardingStep = step + 1
                     },
                     modifier = Modifier.weight(if (step > 0) 0.58f else 1f),
                 )
