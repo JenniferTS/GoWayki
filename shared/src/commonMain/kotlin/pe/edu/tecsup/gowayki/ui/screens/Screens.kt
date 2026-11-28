@@ -757,6 +757,11 @@ fun SettingsScreen(session: AppSession) {
                     )
                 }
             }
+            Spacer(Modifier.height(GowaykiSpace.sm))
+            SoftButton(
+                extraStrings(session.locale == AppLocale.Es).changelogTitle,
+                onClick = { session.go(Screen.Changelog) },
+            )
             AboutSection(session)
             Spacer(Modifier.height(GowaykiSpace.lg))
         }

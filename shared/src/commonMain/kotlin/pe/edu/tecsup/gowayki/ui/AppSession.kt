@@ -103,6 +103,7 @@ sealed class Screen {
     data object Auth : Screen()
     data object ActiveTrip : Screen()
     data object Lines : Screen()
+    data object Changelog : Screen()
     /** Aviso destacado de ubicación, siempre antes del diálogo del sistema. */
     data object LocationDisclosure : Screen()
 }
