@@ -51,6 +51,7 @@ import pe.edu.tecsup.gowayki.domain.preferences.OnboardingStatus
 import pe.edu.tecsup.gowayki.domain.preferences.PreferencesRepository
 import pe.edu.tecsup.gowayki.domain.preferences.RecentTrip
 import pe.edu.tecsup.gowayki.domain.preferences.SavedPlace
+import pe.edu.tecsup.gowayki.domain.preferences.ThemePreference
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialMigrationPolicy
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialProgress
 import pe.edu.tecsup.gowayki.domain.preferences.TutorialStatus
@@ -151,6 +152,9 @@ class AppSession(
             else -> AlarmMode.Sound
         },
     )
+    /** Tema elegido en Ajustes; se guarda y la app lo aplica en `App`. */
+    var themePreference by mutableStateOf(preferences.readThemePreference())
+        private set
     var screen by mutableStateOf<Screen>(Screen.Splash)
         private set
     var onboardingStep by mutableStateOf(0)
@@ -275,6 +279,11 @@ class AppSession(
         refreshPackMapData()
         // Sin pedir permisos al abrir: solo usa la ubicación si ya estaba concedida.
         warmLocation(setAsOrigin = false, userInitiated = false)
+    }
+
+    fun updateTheme(value: ThemePreference) {
+        themePreference = value
+        preferences.saveThemePreference(value)
     }
 
     fun setAlarm(mode: AlarmMode) {
