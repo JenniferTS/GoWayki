@@ -3,15 +3,7 @@
 Migración de la app Flutter `gowayki_lab` a **Kotlin Multiplatform + Compose Multiplatform** (Android e iOS).  
 El original permanece intacto en `~/workspace/gowayki-lab-respaldo` (`31fbe31`).
 
-## Estado
-
-Ver `docs/ESTADO_MIGRACION.md`. Rama de trabajo: `feat/kmp-migration`.
-
-
-
 ## Contribuidores
-
-Equipo del proyecto en este repositorio:
 
 | Integrante | GitHub |
 |---|---|
@@ -21,7 +13,16 @@ Equipo del proyecto en este repositorio:
 | Fabricio Sebastián Rojas Agüero | [@fabriciorojas-10](https://github.com/fabriciorojas-10) |
 | Avril Alondra Enríquez Vilca | [@aenriquezvilca-pixel](https://github.com/aenriquezvilca-pixel) |
 
-Gráfico de contribuidores: https://github.com/JenniferTS/GoWayki/graphs/contributors
+<a href="https://github.com/JenniferTS/GoWayki/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=JenniferTS/GoWayki" alt="Contribuidores" />
+</a>
+
+## Estado
+
+Ver `docs/ESTADO_MIGRACION.md`. Rama de trabajo: `feat/kmp-migration`.
+
+
+
 
 ## Requisitos
 
