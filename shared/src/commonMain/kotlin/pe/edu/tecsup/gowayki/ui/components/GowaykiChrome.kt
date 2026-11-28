@@ -539,6 +539,7 @@ fun InlineMessage(text: String, isError: Boolean, modifier: Modifier = Modifier)
 data class NavItem(
     val label: String,
     val icon: ImageVector,
+    val contentDescription: String? = null,
     val onClick: () -> Unit,
 )
 
@@ -586,7 +587,10 @@ private fun RowScope.NavCell(item: NavItem, active: Boolean) {
             .clip(RoundedCornerShape(GowaykiRadius.md))
             .background(if (active) colors.primarySoft else Color.Transparent)
             .clickable(role = Role.Tab, onClick = item.onClick)
-            .semantics { selected = active }
+            .semantics {
+                selected = active
+                item.contentDescription?.let { contentDescription = it }
+            }
             .padding(horizontal = GowaykiSpace.xs, vertical = GowaykiSpace.sm),
     ) {
         Icon(
