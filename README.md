@@ -7,6 +7,22 @@ El original permanece intacto en `~/workspace/gowayki-lab-respaldo` (`31fbe31`).
 
 Ver `docs/ESTADO_MIGRACION.md`. Rama de trabajo: `feat/kmp-migration`.
 
+
+
+## Contribuidores
+
+Equipo del proyecto en este repositorio:
+
+| Integrante | GitHub |
+|---|---|
+| Sharon Jennifer Trujillo Sulca | [@JenniferTS](https://github.com/JenniferTS) |
+| Piero Nicolás Gómez Lucano | [@NICO-bestacclaimed](https://github.com/NICO-bestacclaimed) |
+| Leonardo Franco Monserrate Paricela | [@LeonardoFMP1902](https://github.com/LeonardoFMP1902) |
+| Fabricio Sebastián Rojas Agüero | [@fabriciorojas-10](https://github.com/fabriciorojas-10) |
+| Avril Alondra Enríquez Vilca | [@aenriquezvilca-pixel](https://github.com/aenriquezvilca-pixel) |
+
+Gráfico de contribuidores: https://github.com/JenniferTS/GoWayki/graphs/contributors
+
 ## Requisitos
 
 - JDK 17+ (Gradle 8.14.8; el build compila con toolchain 17)
