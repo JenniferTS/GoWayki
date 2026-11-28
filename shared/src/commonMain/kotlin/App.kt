@@ -23,6 +23,7 @@ import pe.edu.tecsup.gowayki.ui.AppSession
 import pe.edu.tecsup.gowayki.ui.Screen
 import pe.edu.tecsup.gowayki.ui.screens.ActiveTripScreen
 import pe.edu.tecsup.gowayki.ui.screens.AuthScreen
+import pe.edu.tecsup.gowayki.ui.screens.ChangelogScreen
 import pe.edu.tecsup.gowayki.ui.screens.DetailScreen
 import pe.edu.tecsup.gowayki.ui.screens.GameScreen
 import pe.edu.tecsup.gowayki.ui.screens.HelpScreen
@@ -113,6 +114,7 @@ fun App() {
                 Screen.Auth -> AuthScreen(session)
                 Screen.ActiveTrip -> ActiveTripScreen(session)
                 Screen.Lines -> LinesScreen(session)
+                Screen.Changelog -> ChangelogScreen(session)
                 Screen.LocationDisclosure -> LocationDisclosureScreen(session)
             }
         }
